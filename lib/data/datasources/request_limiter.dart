@@ -1,5 +1,7 @@
+import 'dart:async';
+
 class RequestLimiter {
-  RequestLimiter({this.maxConcurrent = 3});
+  RequestLimiter({this.maxConcurrent = 3}) : assert(maxConcurrent > 0);
 
   final int maxConcurrent;
   int _active = 0;
