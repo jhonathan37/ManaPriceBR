@@ -4,6 +4,28 @@ import 'package:manaprice_br/data/datasources/price_source.dart';
 
 void main() {
   group('LigaMagicScrapeParser', () {
+    test('reads the lowest price from LigaMagic cardsjson', () {
+      const html = '''
+        <html><body>
+          <script>
+            var cardsjson = [
+              {"nEN":"Sol Ring","nPT":"Anel Solar","p1a":"12,50"},
+              {"nEN":"Sol Ring","nPT":"Anel Solar","p1a":"9,90"},
+              {"nEN":"Black Lotus","nPT":"Lótus Preto","p1a":"1,00"}
+            ];
+          </script>
+        </body></html>
+      ''';
+
+      final result = LigaMagicScrapeParser.parse(
+        request: const PriceLookupRequest(cardName: 'Sol Ring'),
+        html: html,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.response.referencePrice, 9.90);
+    });
+
     test('returns the lowest BRL price near the requested card name', () {
       const html = '''
         <html><body>
