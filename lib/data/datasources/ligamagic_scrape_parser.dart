@@ -20,7 +20,7 @@ class LigaMagicScrapeParser {
     required String cardName,
     required String html,
   }) {
-    final normalizedHtml = html.replaceAll(RegExp(r'\\s+'), ' ');
+    final normalizedHtml = html.replaceAll(RegExp(r'\s+'), ' ');
     final escapedName = RegExp.escape(cardName.trim());
     final cardPattern = RegExp(
       '(.{0,800}$escapedName.{0,1800})',
@@ -32,7 +32,7 @@ class LigaMagicScrapeParser {
 
     final block = cardMatch.group(1)!;
     final priceMatches = RegExp(
-      r'R\\$\\s*([0-9]{1,6}(?:\\.[0-9]{3})*,[0-9]{2}|[0-9]+(?:\\.[0-9]{2}))',
+      r'R\$\s*([0-9]{1,6}(?:\.[0-9]{3})*,[0-9]{2}|[0-9]+(?:\.[0-9]{2}))',
     ).allMatches(block);
 
     final prices = <double>[];
@@ -49,7 +49,7 @@ class LigaMagicScrapeParser {
 
     prices.sort();
     final imageMatch = RegExp(
-      r'<img[^>]+(?:src|data-src)=["\\\']([^"\\\']+)["\\\'][^>]*>',
+      r"<img[^>]+(?:src|data-src)=[\"']([^\"']+)[\"'][^>]*>",
       caseSensitive: false,
     ).firstMatch(block);
 
