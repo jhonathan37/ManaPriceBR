@@ -7,6 +7,7 @@ import '../../presentation/pages/card_scanner_page.dart';
 import '../../presentation/result/result_page.dart';
 import '../../presentation/search/search_page.dart';
 import '../../presentation/settings/settings_page.dart';
+import '../services/sale_session.dart';
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -23,6 +24,7 @@ final GoRouter appRouter = GoRouter(
       path: '/batch',
       builder: (context, state) => BatchLookupPage(
         findCard: (name) => DemoCardProvider.find(name),
+        onAddToSale: SaleSession.addAll,
       ),
     ),
     GoRoute(path: '/settings', builder: (context, state) => const SettingsPage()),
