@@ -42,7 +42,7 @@ class CardSearchForm extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          value: language,
+          initialValue: language,
           decoration: const InputDecoration(
             labelText: 'Idioma',
             border: OutlineInputBorder(),
@@ -55,7 +55,7 @@ class CardSearchForm extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         DropdownButtonFormField<String>(
-          value: condition,
+          initialValue: condition,
           decoration: const InputDecoration(
             labelText: 'Condição',
             border: OutlineInputBorder(),
