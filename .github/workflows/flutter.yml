@@ -19,3 +19,11 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Build Android APK
+        run: flutter build apk --release
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: manapricebr-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
