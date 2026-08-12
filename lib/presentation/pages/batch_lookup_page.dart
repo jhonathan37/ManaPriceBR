@@ -6,12 +6,16 @@ import '../../domain/entities/sale_item.dart';
 import '../../domain/services/batch_lookup_service.dart';
 import '../widgets/batch_input.dart';
 import '../widgets/batch_result_summary.dart';
-import '../widgets/batch_progress_card.dart';
 
 class BatchLookupPage extends StatefulWidget {
-  const BatchLookupPage({super.key, required this.findCard});
+  const BatchLookupPage({
+    super.key,
+    required this.findCard,
+    required this.onAddToSale,
+  });
 
   final Future<SaleItem?> Function(String cardName) findCard;
+  final ValueChanged<List<SaleItem>> onAddToSale;
 
   @override
   State<BatchLookupPage> createState() => _BatchLookupPageState();
@@ -24,6 +28,7 @@ class _BatchLookupPageState extends State<BatchLookupPage> {
   int _completed = 0;
   int _total = 0;
   bool _loading = false;
+  bool _addedToSale = false;
 
   @override
   void dispose() {
@@ -46,6 +51,7 @@ class _BatchLookupPageState extends State<BatchLookupPage> {
       _result = null;
       _completed = 0;
       _total = request.normalizedNames.length;
+      _addedToSale = false;
     });
 
     final result = await _service.lookup(
@@ -67,6 +73,16 @@ class _BatchLookupPageState extends State<BatchLookupPage> {
     });
   }
 
+  void _addResultToSale() {
+    final result = _result;
+    if (result == null || result.items.isEmpty || _addedToSale) return;
+    widget.onAddToSale(List.unmodifiable(result.items));
+    setState(() => _addedToSale = true);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${result.items.length} carta(s) adicionada(s) à venda.')),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final progress = _total == 0 ? null : (_completed / _total).clamp(0.0, 1.0);
@@ -85,6 +101,12 @@ class _BatchLookupPageState extends State<BatchLookupPage> {
           if (_result != null) ...[
             const SizedBox(height: 16),
             BatchResultSummary(result: _result!),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: _result!.items.isEmpty || _addedToSale ? null : _addResultToSale,
+              icon: Icon(_addedToSale ? Icons.check : Icons.add_shopping_cart),
+              label: Text(_addedToSale ? 'ADICIONADO À VENDA' : 'ADICIONAR ENCONTRADAS À VENDA'),
+            ),
           ],
         ],
       ),
