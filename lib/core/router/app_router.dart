@@ -36,9 +36,10 @@ final GoRouter appRouter = GoRouter(
     ),
     GoRoute(
       path: '/result',
-      builder: (context, state) => ResultPage(
-        cardName: (state.extra as Map<String, dynamic>?)?['name'] as String?,
-      ),
+      builder: (context, state) {
+        final extra = state.extra as Map<String, dynamic>? ?? const <String, dynamic>{};
+        return ResultPage(filters: extra);
+      },
     ),
   ],
 );
