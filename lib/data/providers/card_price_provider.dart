@@ -2,7 +2,6 @@ import '../../domain/entities/sale_item.dart';
 import '../datasources/ligamagic_scrape_client.dart';
 import '../datasources/price_source.dart';
 import '../datasources/scryfall_catalog_client.dart';
-import 'demo_card_provider.dart';
 
 class CardPriceProvider {
   CardPriceProvider({
@@ -16,28 +15,40 @@ class CardPriceProvider {
 
   Future<SaleItem?> find(
     String cardName, {
+    String? setCode,
+    String? setName,
+    String? collectorNumber,
     String language = 'Português',
     String condition = 'NM',
     bool foil = false,
     double discountPercent = 20,
-    bool allowDemoFallback = true,
   }) async {
     final normalized = cardName.trim();
-    if (normalized.isEmpty) return null;
-
-    ScryfallCatalogCard? catalogCard;
-    try {
-      catalogCard = await _catalogClient.find(normalized);
-    } catch (_) {
-      // Catalog lookup is best effort. We can still try LigaMagic directly.
+    if (normalized.isEmpty ||
+        setCode == null || setCode.isEmpty ||
+        collectorNumber == null || collectorNumber.isEmpty) {
+      return null;
     }
 
-    final canonicalName = catalogCard?.name ?? normalized;
+    String? printingImage;
+    try {
+      final printings = await _catalogClient.printings(normalized);
+      for (final printing in printings) {
+        if (printing.setCode.toLowerCase() == setCode.toLowerCase() &&
+            printing.collectorNumber.toLowerCase() == collectorNumber.toLowerCase()) {
+          printingImage = printing.imageUrl;
+          break;
+        }
+      }
+    } catch (_) {}
 
     try {
       final result = await _client.lookup(
         PriceLookupRequest(
-          cardName: canonicalName,
+          cardName: normalized,
+          setCode: setCode,
+          setName: setName,
+          collectorNumber: collectorNumber,
           language: language,
           condition: condition,
           foil: foil,
@@ -46,42 +57,23 @@ class CardPriceProvider {
 
       if (result != null) {
         return SaleItem(
-          cardName: canonicalName,
+          cardName: normalized,
           referencePrice: result.response.referencePrice,
           discountPercent: discountPercent,
-          imageUrl: result.imageUrl ?? catalogCard?.imageUrl,
+          imageUrl: printingImage ?? result.imageUrl,
           priceAvailable: true,
           sourceName: result.response.sourceName,
         );
       }
-    } catch (_) {
-      // LigaMagic may throttle or block automated requests.
-    }
+    } catch (_) {}
 
-    if (catalogCard != null) {
-      return SaleItem(
-        cardName: catalogCard.name,
-        referencePrice: 0,
-        discountPercent: discountPercent,
-        imageUrl: catalogCard.imageUrl,
-        priceAvailable: false,
-        sourceName: 'Scryfall (catálogo)',
-      );
-    }
-
-    if (!allowDemoFallback) return null;
-    final demo = await DemoCardProvider.find(
-      normalized,
-      discountPercent: discountPercent,
-    );
-    if (demo == null) return null;
     return SaleItem(
-      cardName: demo.cardName,
-      referencePrice: demo.referencePrice,
-      discountPercent: demo.discountPercent,
-      imageUrl: demo.imageUrl,
-      priceAvailable: true,
-      sourceName: 'Catálogo local de teste',
+      cardName: normalized,
+      referencePrice: 0,
+      discountPercent: discountPercent,
+      imageUrl: printingImage,
+      priceAvailable: false,
+      sourceName: 'LigaMagic',
     );
   }
 }
