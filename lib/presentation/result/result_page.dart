@@ -25,18 +25,15 @@ class _ResultPageState extends State<ResultPage> {
   }
 
   Future<void> _load() async {
-    final name = widget.filters['name'] as String? ?? '';
-    final language = widget.filters['language'] as String? ?? 'Português';
-    final condition = widget.filters['condition'] as String? ?? 'NM';
-    final foil = widget.filters['foil'] as bool? ?? false;
-
     final item = await _provider.find(
-      name,
-      language: language,
-      condition: condition,
-      foil: foil,
+      widget.filters['name'] as String? ?? '',
+      setCode: widget.filters['setCode'] as String?,
+      setName: widget.filters['setName'] as String?,
+      collectorNumber: widget.filters['collectorNumber'] as String?,
+      language: widget.filters['language'] as String? ?? 'Português',
+      condition: widget.filters['condition'] as String? ?? 'NM',
+      foil: widget.filters['foil'] as bool? ?? false,
       discountPercent: _discount,
-      allowDemoFallback: true,
     );
 
     if (!mounted) return;
@@ -72,59 +69,39 @@ class _ResultPageState extends State<ResultPage> {
     final language = widget.filters['language'] as String? ?? 'Português';
     final condition = widget.filters['condition'] as String? ?? 'NM';
     final foil = widget.filters['foil'] as bool? ?? false;
+    final setName = widget.filters['setName'] as String? ?? 'Edição não informada';
+    final setCode = widget.filters['setCode'] as String? ?? '';
+    final collector = widget.filters['collectorNumber'] as String? ?? '';
+    final selectedImage = widget.filters['imageUrl'] as String?;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Resultado')),
+      appBar: AppBar(title: const Text('Menor preço real')),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _item == null
-              ? Center(
+              ? const Center(
                   child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const Icon(Icons.search_off, size: 64),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Carta não encontrada: $name. Confira a grafia ou tente fotografar novamente.',
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
+                    padding: EdgeInsets.all(24),
+                    child: Text(
+                      'A impressão exata não foi informada. Volte e selecione a edição da carta.',
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 )
               : ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
-                    if (!_item!.priceAvailable)
-                      const Card(
-                        child: Padding(
-                          padding: EdgeInsets.all(12),
-                          child: Row(
-                            children: [
-                              Icon(Icons.info_outline),
-                              SizedBox(width: 10),
-                              Expanded(
-                                child: Text(
-                                  'Carta encontrada no catálogo. O preço brasileiro está temporariamente indisponível porque a fonte de preço não respondeu.',
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (_item!.imageUrl != null && _item!.imageUrl!.isNotEmpty) ...[
+                            if ((_item!.imageUrl ?? selectedImage) != null) ...[
                               Center(
                                 child: Image.network(
-                                  _item!.imageUrl!,
-                                  height: 260,
+                                  _item!.imageUrl ?? selectedImage!,
+                                  height: 280,
                                   fit: BoxFit.contain,
                                   errorBuilder: (_, __, ___) => const SizedBox.shrink(),
                                 ),
@@ -132,19 +109,26 @@ class _ResultPageState extends State<ResultPage> {
                               const SizedBox(height: 16),
                             ],
                             Text(
-                              _item!.cardName,
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                              name,
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(fontWeight: FontWeight.bold),
                             ),
                             const SizedBox(height: 8),
-                            Text('$language • $condition${foil ? ' • Foil' : ''}'),
-                            if (_item!.sourceName != null) ...[
-                              const SizedBox(height: 6),
-                              Text('Fonte: ${_item!.sourceName}'),
-                            ],
+                            Text('$setName${setCode.isEmpty ? '' : ' ($setCode)'}${collector.isEmpty ? '' : ' • #$collector'}'),
+                            Text('$language • $condition • ${foil ? 'Foil' : 'Não Foil'}'),
                             const Divider(height: 32),
                             if (_item!.priceAvailable) ...[
-                              const Text('Preço de referência'),
-                              Text(_money(_item!.referencePrice), style: Theme.of(context).textTheme.headlineMedium),
+                              const Text('Menor preço real encontrado na LigaMagic'),
+                              Text(
+                                _money(_item!.referencePrice),
+                                style: Theme.of(context).textTheme.headlineMedium,
+                              ),
+                              const SizedBox(height: 8),
+                              const Text(
+                                'Esse valor corresponde à combinação selecionada de edição, idioma, condição e acabamento.',
+                              ),
                               const SizedBox(height: 24),
                               Text('Desconto: ${_discount.toStringAsFixed(0)}%'),
                               Slider(
@@ -159,33 +143,28 @@ class _ResultPageState extends State<ResultPage> {
                               const Text('Você recebe'),
                               Text(
                                 _money(_item!.finalValue),
-                                style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .headlineMedium
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                             ] else ...[
                               Text(
-                                'Preço BR indisponível no momento',
-                                style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+                                'Nenhuma oferta compatível foi retornada pela LigaMagic.',
+                                style: Theme.of(context)
+                                    .textTheme
+                                    .titleLarge
+                                    ?.copyWith(fontWeight: FontWeight.bold),
                               ),
                               const SizedBox(height: 8),
-                              const Text('O app não inventa nem converte um preço estrangeiro para parecer preço da LigaMagic.'),
+                              const Text(
+                                'O ManaPriceBR não substitui esse valor por estimativa, conversão ou preço de outra edição.',
+                              ),
                             ],
                           ],
                         ),
                       ),
                     ),
-                    if (_item!.priceAvailable) ...[
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: () {
-                          final text = '${_item!.cardName} | $condition | ${_money(_item!.finalValue)}';
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text('Anúncio pronto: $text')),
-                          );
-                        },
-                        icon: const Icon(Icons.copy),
-                        label: const Text('Copiar anúncio'),
-                      ),
-                    ],
                   ],
                 ),
     );
