@@ -19,21 +19,19 @@ class LigaMagicScrapeParser {
   }) {
     final normalizedHtml = html.replaceAll(RegExp(r'\s+'), ' ');
     final escapedName = RegExp.escape(request.cardName.trim());
-
-    final blocks = RegExp(
-      '(.{0,1200}$escapedName.{0,3200})',
+    final nameMatches = RegExp(
+      escapedName,
       caseSensitive: false,
-      dotAll: true,
     ).allMatches(normalizedHtml);
 
     final prices = <double>[];
     String? imageUrl;
 
-    for (final match in blocks) {
-      final block = match.group(1);
-      if (block == null) continue;
-      prices.addAll(_extractPrices(block));
+    for (final nameMatch in nameMatches) {
+      final block = _blockAfterCardName(normalizedHtml, nameMatch.end);
+      if (block.isEmpty) continue;
 
+      prices.addAll(_extractPrices(block));
       imageUrl ??= RegExp(
         r'<img[^>]+(?:src|data-src)="([^"]+)"[^>]*>',
         caseSensitive: false,
@@ -51,6 +49,30 @@ class LigaMagicScrapeParser {
       ),
       imageUrl: imageUrl,
     );
+  }
+
+  static String _blockAfterCardName(String html, int start) {
+    final maxEnd = (start + 2400).clamp(0, html.length);
+    final tail = html.substring(start, maxEnd);
+
+    // Prefer semantic/container boundaries so a cheaper price from a previous
+    // or following card does not contaminate the requested card's result.
+    final boundaryPatterns = <RegExp>[
+      RegExp(r'</section\s*>', caseSensitive: false),
+      RegExp(r'</article\s*>', caseSensitive: false),
+      RegExp(r'</li\s*>', caseSensitive: false),
+      RegExp(r'</tr\s*>', caseSensitive: false),
+      RegExp(r'<h[1-4][^>]*>', caseSensitive: false),
+    ];
+
+    int? boundary;
+    for (final pattern in boundaryPatterns) {
+      final match = pattern.firstMatch(tail);
+      if (match == null || match.start == 0) continue;
+      if (boundary == null || match.start < boundary) boundary = match.start;
+    }
+
+    return boundary == null ? tail : tail.substring(0, boundary);
   }
 
   static List<double> _extractPrices(String block) {
