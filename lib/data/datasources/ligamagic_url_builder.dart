@@ -3,20 +3,32 @@ import 'price_source.dart';
 class LigaMagicUrlBuilder {
   const LigaMagicUrlBuilder._();
 
-  static Uri build(PriceLookupRequest request) {
-    final query = <String, String>{
-      'q': request.cardName,
-      'language': request.language,
-      'condition': request.condition,
-      'foil': request.foil ? '1' : '0',
-      if (request.setCode != null && request.setCode!.isNotEmpty)
-        'set': request.setCode!,
-      if (request.setName != null && request.setName!.isNotEmpty)
-        'edition': request.setName!,
-      if (request.collectorNumber != null && request.collectorNumber!.isNotEmpty)
-        'collector': request.collectorNumber!,
-    };
+  static Uri card(PriceLookupRequest request) {
+    return Uri.https(
+      'www.ligamagic.com.br',
+      '/',
+      {
+        'view': 'cards/card',
+        'card': _frontFace(request.cardName),
+      },
+    );
+  }
 
-    return Uri.https('www.ligamagic.com.br', '/', query);
+  static Uri search(PriceLookupRequest request) {
+    return Uri.https(
+      'www.ligamagic.com.br',
+      '/',
+      {
+        'view': 'cards/search',
+        'card': _frontFace(request.cardName),
+      },
+    );
+  }
+
+  static Uri build(PriceLookupRequest request) => card(request);
+
+  static String _frontFace(String name) {
+    final index = name.indexOf(' // ');
+    return (index >= 0 ? name.substring(0, index) : name).trim();
   }
 }
