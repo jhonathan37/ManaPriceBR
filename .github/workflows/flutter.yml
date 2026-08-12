@@ -19,6 +19,8 @@ jobs:
       - run: flutter pub get
       - run: flutter analyze
       - run: flutter test
+      - name: Generate Android platform
+        run: flutter create --platforms=android --project-name manaprice_br .
       - name: Build Android APK
         run: flutter build apk --release
       - name: Upload Android APK
