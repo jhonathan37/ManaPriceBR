@@ -1,7 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:manaprice_br/core/services/sale_calculator.dart';
 
-describe('SaleCalculator', () {
+group('SaleCalculator', () {
   test('calculates final value after discount', () {
     expect(SaleCalculator.finalValue(100, 15), closeTo(85, 0.000001));
     expect(SaleCalculator.discountAmount(100, 15), closeTo(15, 0.000001));
