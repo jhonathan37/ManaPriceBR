@@ -2,17 +2,25 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key});
+  const SearchPage({super.key, this.initialName});
+
+  final String? initialName;
 
   @override
   State<SearchPage> createState() => _SearchPageState();
 }
 
 class _SearchPageState extends State<SearchPage> {
-  final _controller = TextEditingController();
+  late final TextEditingController _controller;
   String language = 'Português';
   String condition = 'NM';
   bool foil = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.initialName ?? '');
+  }
 
   @override
   void dispose() {
@@ -52,6 +60,12 @@ class _SearchPageState extends State<SearchPage> {
               hintText: 'Ex.: The One Ring',
               prefixIcon: Icon(Icons.search),
             ),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            onPressed: () => context.push('/scanner'),
+            icon: const Icon(Icons.photo_camera_outlined),
+            label: const Text('Ler nome pela câmera'),
           ),
           const SizedBox(height: 20),
           DropdownButtonFormField<String>(
