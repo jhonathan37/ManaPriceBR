@@ -1,6 +1,6 @@
 import 'package:go_router/go_router.dart';
 
-import '../../data/providers/demo_card_provider.dart';
+import '../../data/providers/card_price_provider.dart';
 import '../../presentation/home/home_page.dart';
 import '../../presentation/pages/batch_lookup_page.dart';
 import '../../presentation/pages/card_scanner_page.dart';
@@ -8,6 +8,8 @@ import '../../presentation/result/result_page.dart';
 import '../../presentation/search/search_page.dart';
 import '../../presentation/settings/settings_page.dart';
 import '../services/sale_session.dart';
+
+final _cardPriceProvider = CardPriceProvider();
 
 final GoRouter appRouter = GoRouter(
   initialLocation: '/',
@@ -23,7 +25,7 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/batch',
       builder: (context, state) => BatchLookupPage(
-        findCard: (name) => DemoCardProvider.find(name),
+        findCard: (name) => _cardPriceProvider.find(name),
         onAddToSale: SaleSession.addAll,
       ),
     ),
