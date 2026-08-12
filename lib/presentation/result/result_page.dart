@@ -1,61 +1,132 @@
 import 'package:flutter/material.dart';
 
-class ResultPage extends StatelessWidget {
+import '../../data/providers/demo_card_provider.dart';
+import '../../domain/entities/sale_item.dart';
+
+class ResultPage extends StatefulWidget {
+  const ResultPage({super.key, required this.filters});
+
   final Map<String, dynamic> filters;
 
-  const ResultPage({super.key, required this.filters});
+  @override
+  State<ResultPage> createState() => _ResultPageState();
+}
+
+class _ResultPageState extends State<ResultPage> {
+  SaleItem? _item;
+  bool _loading = true;
+  double _discount = 20;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final name = widget.filters['name'] as String? ?? '';
+    final item = await DemoCardProvider.find(name, discountPercent: _discount);
+    if (!mounted) return;
+    setState(() {
+      _item = item;
+      _loading = false;
+    });
+  }
+
+  void _setDiscount(double value) {
+    final item = _item;
+    setState(() {
+      _discount = value;
+      if (item != null) {
+        _item = SaleItem(
+          cardName: item.cardName,
+          referencePrice: item.referencePrice,
+          discountPercent: value,
+          imageUrl: item.imageUrl,
+        );
+      }
+    });
+  }
+
+  String _money(double value) =>
+      'R\$ ${value.toStringAsFixed(2).replaceAll('.', ',')}';
 
   @override
   Widget build(BuildContext context) {
-    final name = filters['name'] as String? ?? 'Carta';
-    final language = filters['language'] as String? ?? 'Português';
-    final condition = filters['condition'] as String? ?? 'NM';
-    final foil = filters['foil'] as bool? ?? false;
-
-    // Valor demonstrativo da primeira versão. A fonte real de preços será
-    // ligada posteriormente através do PriceProvider.
-    const marketPrice = 100.0;
-    const discount = 15.0;
-    final suggested = marketPrice * (1 - discount / 100);
+    final name = widget.filters['name'] as String? ?? 'Carta';
+    final language = widget.filters['language'] as String? ?? 'Português';
+    final condition = widget.filters['condition'] as String? ?? 'NM';
+    final foil = widget.filters['foil'] as bool? ?? false;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Resultado')),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(name, style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 12),
-                  Text('$language • $condition${foil ? ' • Foil' : ''}'),
-                  const Divider(height: 32),
-                  const Text('Preço encontrado'),
-                  Text('R\$ ${marketPrice.toStringAsFixed(2).replaceAll('.', ',')}', style: Theme.of(context).textTheme.headlineMedium),
-                  const SizedBox(height: 20),
-                  const Text('Desconto aplicado'),
-                  Text('${discount.toStringAsFixed(0)}%'),
-                  const SizedBox(height: 20),
-                  const Text('Preço sugerido'),
-                  Text('R\$ ${suggested.toStringAsFixed(2).replaceAll('.', ',')}', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          FilledButton.icon(
-            onPressed: () {
-              final text = '$name | $condition | R\$ ${suggested.toStringAsFixed(2).replaceAll('.', ',')}';
-              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Anúncio pronto: $text')));
-            },
-            icon: const Icon(Icons.copy),
-            label: const Text('Copiar anúncio'),
-          ),
-        ],
-      ),
+      body: _loading
+          ? const Center(child: CircularProgressIndicator())
+          : _item == null
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.search_off, size: 64),
+                        const SizedBox(height: 16),
+                        Text('Carta não encontrada no catálogo de teste: $name', textAlign: TextAlign.center),
+                      ],
+                    ),
+                  ),
+                )
+              : ListView(
+                  padding: const EdgeInsets.all(20),
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              _item!.cardName,
+                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            Text('$language • $condition${foil ? ' • Foil' : ''}'),
+                            const Divider(height: 32),
+                            const Text('Preço de referência'),
+                            Text(_money(_item!.referencePrice), style: Theme.of(context).textTheme.headlineMedium),
+                            const SizedBox(height: 24),
+                            Text('Desconto: ${_discount.toStringAsFixed(0)}%'),
+                            Slider(
+                              value: _discount,
+                              min: 0,
+                              max: 100,
+                              divisions: 20,
+                              label: '${_discount.toStringAsFixed(0)}%',
+                              onChanged: _setDiscount,
+                            ),
+                            const SizedBox(height: 12),
+                            const Text('Você recebe'),
+                            Text(
+                              _money(_item!.finalValue),
+                              style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton.icon(
+                      onPressed: () {
+                        final text = '${_item!.cardName} | $condition | ${_money(_item!.finalValue)}';
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(content: Text('Anúncio pronto: $text')),
+                        );
+                      },
+                      icon: const Icon(Icons.copy),
+                      label: const Text('Copiar anúncio'),
+                    ),
+                  ],
+                ),
     );
   }
 }
