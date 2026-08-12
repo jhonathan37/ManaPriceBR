@@ -15,52 +15,33 @@ class CardPriceProvider {
 
   Future<SaleItem?> find(
     String cardName, {
-    String? setCode,
-    String? setName,
-    String? collectorNumber,
-    String language = 'Português',
-    String condition = 'NM',
-    bool foil = false,
     double discountPercent = 20,
   }) async {
     final normalized = cardName.trim();
-    if (normalized.isEmpty ||
-        setCode == null || setCode.isEmpty ||
-        collectorNumber == null || collectorNumber.isEmpty) {
-      return null;
-    }
+    if (normalized.isEmpty) return null;
 
-    String? printingImage;
+    String canonicalName = normalized;
+    String? catalogImage;
+
     try {
-      final printings = await _catalogClient.printings(normalized);
-      for (final printing in printings) {
-        if (printing.setCode.toLowerCase() == setCode.toLowerCase() &&
-            printing.collectorNumber.toLowerCase() == collectorNumber.toLowerCase()) {
-          printingImage = printing.imageUrl;
-          break;
-        }
+      final catalogCard = await _catalogClient.find(normalized);
+      if (catalogCard != null) {
+        canonicalName = catalogCard.name;
+        catalogImage = catalogCard.imageUrl;
       }
     } catch (_) {}
 
     try {
       final result = await _client.lookup(
-        PriceLookupRequest(
-          cardName: normalized,
-          setCode: setCode,
-          setName: setName,
-          collectorNumber: collectorNumber,
-          language: language,
-          condition: condition,
-          foil: foil,
-        ),
+        PriceLookupRequest(cardName: canonicalName),
       );
 
       if (result != null) {
         return SaleItem(
-          cardName: normalized,
+          cardName: canonicalName,
           referencePrice: result.response.referencePrice,
           discountPercent: discountPercent,
-          imageUrl: printingImage ?? result.imageUrl,
+          imageUrl: catalogImage ?? result.imageUrl,
           priceAvailable: true,
           sourceName: result.response.sourceName,
         );
@@ -68,10 +49,10 @@ class CardPriceProvider {
     } catch (_) {}
 
     return SaleItem(
-      cardName: normalized,
+      cardName: canonicalName,
       referencePrice: 0,
       discountPercent: discountPercent,
-      imageUrl: printingImage,
+      imageUrl: catalogImage,
       priceAvailable: false,
       sourceName: 'LigaMagic',
     );
