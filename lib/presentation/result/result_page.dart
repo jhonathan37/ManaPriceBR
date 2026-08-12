@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../data/providers/demo_card_provider.dart';
+import '../../data/providers/card_price_provider.dart';
 import '../../domain/entities/sale_item.dart';
 
 class ResultPage extends StatefulWidget {
@@ -13,8 +13,10 @@ class ResultPage extends StatefulWidget {
 }
 
 class _ResultPageState extends State<ResultPage> {
+  final _provider = CardPriceProvider();
   SaleItem? _item;
   bool _loading = true;
+  bool _usedFallback = false;
   double _discount = 20;
 
   @override
@@ -25,10 +27,32 @@ class _ResultPageState extends State<ResultPage> {
 
   Future<void> _load() async {
     final name = widget.filters['name'] as String? ?? '';
-    final item = await DemoCardProvider.find(name, discountPercent: _discount);
+    final language = widget.filters['language'] as String? ?? 'Português';
+    final condition = widget.filters['condition'] as String? ?? 'NM';
+    final foil = widget.filters['foil'] as bool? ?? false;
+
+    final real = await _provider.find(
+      name,
+      language: language,
+      condition: condition,
+      foil: foil,
+      discountPercent: _discount,
+      allowDemoFallback: false,
+    );
+
+    final item = real ?? await _provider.find(
+      name,
+      language: language,
+      condition: condition,
+      foil: foil,
+      discountPercent: _discount,
+      allowDemoFallback: true,
+    );
+
     if (!mounted) return;
     setState(() {
       _item = item;
+      _usedFallback = real == null && item != null;
       _loading = false;
     });
   }
@@ -71,7 +95,7 @@ class _ResultPageState extends State<ResultPage> {
                       children: [
                         const Icon(Icons.search_off, size: 64),
                         const SizedBox(height: 16),
-                        Text('Carta não encontrada no catálogo de teste: $name', textAlign: TextAlign.center),
+                        Text('Não foi possível obter preço para $name.', textAlign: TextAlign.center),
                       ],
                     ),
                   ),
@@ -79,12 +103,40 @@ class _ResultPageState extends State<ResultPage> {
               : ListView(
                   padding: const EdgeInsets.all(20),
                   children: [
+                    if (_usedFallback)
+                      Card(
+                        child: Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: const [
+                              Icon(Icons.info_outline),
+                              SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'A LigaMagic não respondeu à consulta. Mostrando preço de demonstração quando disponível.',
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     Card(
                       child: Padding(
                         padding: const EdgeInsets.all(20),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
+                            if (_item!.imageUrl != null && _item!.imageUrl!.isNotEmpty) ...[
+                              Center(
+                                child: Image.network(
+                                  _item!.imageUrl!,
+                                  height: 260,
+                                  fit: BoxFit.contain,
+                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                                ),
+                              ),
+                              const SizedBox(height: 16),
+                            ],
                             Text(
                               _item!.cardName,
                               style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
