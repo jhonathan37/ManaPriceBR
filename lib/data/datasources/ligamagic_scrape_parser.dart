@@ -49,7 +49,7 @@ class LigaMagicScrapeParser {
 
     prices.sort();
     final imageMatch = RegExp(
-      r"<img[^>]+(?:src|data-src)=[\"']([^\"']+)[\"'][^>]*>",
+      r'<img[^>]+(?:src|data-src)="([^"]+)"[^>]*>',
       caseSensitive: false,
     ).firstMatch(block);
 
