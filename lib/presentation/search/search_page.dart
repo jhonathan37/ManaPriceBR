@@ -121,6 +121,14 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 
+  CardPrinting? _printingById(String? id) {
+    if (id == null) return null;
+    for (final printing in _printings) {
+      if (printing.id == id) return printing;
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -171,16 +179,14 @@ class _SearchPageState extends State<SearchPage> {
           if (_printings.isNotEmpty) ...[
             const SizedBox(height: 20),
             DropdownButtonFormField<String>(
-              value: _selectedPrinting?.id,
+              key: ValueKey(_selectedPrinting?.id),
+              initialValue: _selectedPrinting?.id,
               isExpanded: true,
               decoration: const InputDecoration(labelText: 'Edição / impressão'),
               items: _printings
                   .map((p) => DropdownMenuItem(value: p.id, child: Text(p.label)))
                   .toList(growable: false),
-              onChanged: (id) {
-                final selected = _printings.where((p) => p.id == id).firstOrNull;
-                setState(() => _selectedPrinting = selected);
-              },
+              onChanged: (id) => setState(() => _selectedPrinting = _printingById(id)),
             ),
             if (_selectedPrinting?.imageUrl != null) ...[
               const SizedBox(height: 16),
