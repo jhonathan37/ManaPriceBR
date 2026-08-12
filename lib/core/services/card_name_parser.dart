@@ -17,7 +17,7 @@ class CardNameParser {
 
     for (final line in lines) {
       final normalized = line
-          .replaceAll(RegExp(r'[^\p{L}\p{N}\'\- ]', unicode: true), '')
+          .replaceAll(RegExp(r"[^\p{L}\p{N}'\- ]", unicode: true), '')
           .replaceAll(RegExp(r'\s+'), ' ')
           .trim();
       if (normalized.length >= 3 && !ignored.hasMatch(normalized)) {
