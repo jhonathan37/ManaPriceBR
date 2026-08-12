@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'card_scanner_page.dart';
 import '../widgets/card_search_form.dart';
 import '../widgets/card_price_result.dart';
 
@@ -23,6 +24,27 @@ class _CardSearchPageState extends State<CardSearchPage> {
   void dispose() {
     _nameController.dispose();
     super.dispose();
+  }
+
+  Future<void> _openScanner() async {
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => CardScannerPage(
+          onCardNameDetected: (name) {
+            _nameController.text = name;
+            Navigator.of(context).pop();
+          },
+        ),
+      ),
+    );
+
+    if (!mounted) return;
+    if (_nameController.text.trim().isNotEmpty) {
+      setState(() {
+        _error = null;
+        _searchedName = null;
+      });
+    }
   }
 
   Future<void> _search() async {
@@ -59,6 +81,12 @@ class _CardSearchPageState extends State<CardSearchPage> {
             Text(
               'Consultar carta',
               style: Theme.of(context).textTheme.headlineSmall,
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _loading ? null : _openScanner,
+              icon: const Icon(Icons.photo_camera),
+              label: const Text('TIRAR FOTO DA CARTA'),
             ),
             const SizedBox(height: 16),
             CardSearchForm(
