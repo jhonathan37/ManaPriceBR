@@ -10,6 +10,8 @@ class LigaMagicScrapeClient {
   final Dio _dio;
 
   Future<LigaMagicScrapeResult?> lookup(PriceLookupRequest request) async {
+    if (!request.hasExactPrinting) return null;
+
     final uri = LigaMagicUrlBuilder.build(request);
     final response = await _dio.getUri<String>(
       uri,
@@ -18,15 +20,18 @@ class LigaMagicScrapeClient {
         headers: const {
           'Accept': 'text/html,application/xhtml+xml',
           'Accept-Language': 'pt-BR,pt;q=0.9',
+          'User-Agent': 'Mozilla/5.0 ManaPriceBR/0.1',
         },
+        validateStatus: (status) => status != null && status < 500,
       ),
     );
 
+    if (response.statusCode != 200) return null;
     final body = response.data;
     if (body == null || body.isEmpty) return null;
 
     return LigaMagicScrapeParser.parse(
-      cardName: request.cardName,
+      request: request,
       html: body,
     );
   }
