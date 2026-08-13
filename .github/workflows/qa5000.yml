@@ -10,7 +10,7 @@ on:
 jobs:
   audit:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -19,13 +19,14 @@ jobs:
           channel: stable
           cache: true
       - run: flutter pub get
-      - name: Audit 5000 catalog cards and LigaMagic price sample
-        run: dart run tool/qa_5000.dart --limit=5000 --price-limit=100 --delay-ms=800
+      - name: Audit 5000 cards sequentially against LigaMagic
+        run: dart run tool/qa_5000.dart --limit=5000 --price-limit=5000 --delay-ms=1000
       - name: Upload QA reports
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: manapricebr-qa-5000-report
           path: |
             qa_5000_report.csv
             qa_5000_summary.json
-          if-no-files-found: error
+          if-no-files-found: warn
