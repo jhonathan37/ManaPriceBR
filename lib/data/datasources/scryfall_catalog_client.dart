@@ -22,6 +22,33 @@ class ScryfallCatalogClient {
     'Accept': 'application/json;q=0.9,*/*;q=0.8',
   };
 
+  Future<List<String>> autocomplete(String query) async {
+    final name = query.trim();
+    if (name.length < 2) return const [];
+
+    final response = await _dio.get<Map<String, dynamic>>(
+      'https://api.scryfall.com/cards/autocomplete',
+      queryParameters: {
+        'q': name,
+        'include_extras': true,
+      },
+      options: Options(
+        headers: _headers,
+        validateStatus: (status) => status != null && status < 500,
+      ),
+    );
+
+    if (response.statusCode != 200 || response.data == null) return const [];
+    final rows = response.data!['data'];
+    if (rows is! List) return const [];
+
+    return rows
+        .whereType<String>()
+        .where((value) => value.trim().isNotEmpty)
+        .take(8)
+        .toList(growable: false);
+  }
+
   Future<ScryfallCatalogCard?> find(String query) async {
     final name = query.trim();
     if (name.isEmpty) return null;
