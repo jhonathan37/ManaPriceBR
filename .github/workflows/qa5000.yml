@@ -1,0 +1,31 @@
+name: 5000 Card QA
+
+on:
+  push:
+    paths:
+      - 'tool/qa_5000.dart'
+      - '.github/workflows/qa5000.yml'
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.35.0'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Audit 5000 catalog cards and LigaMagic price sample
+        run: dart run tool/qa_5000.dart --limit=5000 --price-limit=100 --delay-ms=800
+      - name: Upload QA reports
+        uses: actions/upload-artifact@v4
+        with:
+          name: manapricebr-qa-5000-report
+          path: |
+            qa_5000_report.csv
+            qa_5000_summary.json
+          if-no-files-found: error
