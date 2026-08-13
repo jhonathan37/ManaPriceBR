@@ -152,9 +152,13 @@ class LigaMagicScrapeParser {
     if (raw == null) return null;
     var value = raw.toString().trim().replaceAll('R\$', '').trim();
     if (value.isEmpty || value == '-' || value == '0') return null;
+
     if (value.contains(',')) {
       value = value.replaceAll('.', '').replaceAll(',', '.');
+    } else if (RegExp(r'^\d{1,3}(?:\.\d{3})+$').hasMatch(value)) {
+      value = value.replaceAll('.', '');
     }
+
     return double.tryParse(value);
   }
 
@@ -188,7 +192,7 @@ class LigaMagicScrapeParser {
   static List<double> _extractVisiblePrices(String block) {
     final prices = <double>[];
     final matches = RegExp(
-      r'R\$\s*([0-9]{1,6}(?:\.[0-9]{3})*,[0-9]{2}|[0-9]+(?:\.[0-9]{2}))',
+      r'R\$\s*((?:\d{1,3}(?:\.\d{3})+|\d+)(?:,\d{2})?)',
     ).allMatches(block);
 
     for (final match in matches) {
