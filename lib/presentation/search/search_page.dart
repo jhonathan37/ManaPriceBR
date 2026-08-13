@@ -1,5 +1,9 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../data/datasources/scryfall_catalog_client.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key, this.initialName});
@@ -12,6 +16,10 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   late final TextEditingController _controller;
+  final ScryfallCatalogClient _catalog = ScryfallCatalogClient();
+  Timer? _debounce;
+  List<String> _suggestions = const [];
+  bool _loadingSuggestions = false;
 
   @override
   void initState() {
@@ -21,8 +29,49 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _controller.dispose();
     super.dispose();
+  }
+
+  void _onChanged(String value) {
+    _debounce?.cancel();
+    final query = value.trim();
+
+    if (query.length < 2) {
+      setState(() {
+        _suggestions = const [];
+        _loadingSuggestions = false;
+      });
+      return;
+    }
+
+    _debounce = Timer(const Duration(milliseconds: 350), () async {
+      if (!mounted) return;
+      setState(() => _loadingSuggestions = true);
+
+      try {
+        final items = await _catalog.autocomplete(query);
+        if (!mounted || _controller.text.trim() != query) return;
+        setState(() {
+          _suggestions = items;
+          _loadingSuggestions = false;
+        });
+      } catch (_) {
+        if (!mounted) return;
+        setState(() {
+          _suggestions = const [];
+          _loadingSuggestions = false;
+        });
+      }
+    });
+  }
+
+  void _selectSuggestion(String name) {
+    _controller.text = name;
+    _controller.selection = TextSelection.collapsed(offset: name.length);
+    setState(() => _suggestions = const []);
+    _search();
   }
 
   void _search() {
@@ -34,6 +83,8 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
 
+    FocusScope.of(context).unfocus();
+    setState(() => _suggestions = const []);
     context.push('/result', extra: {'name': name});
   }
 
@@ -48,14 +99,48 @@ class _SearchPageState extends State<SearchPage> {
             controller: _controller,
             autofocus: widget.initialName?.isEmpty ?? true,
             textInputAction: TextInputAction.search,
+            onChanged: _onChanged,
             onSubmitted: (_) => _search(),
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Nome da carta',
-              hintText: 'Ex.: The One Ring',
-              prefixIcon: Icon(Icons.search),
-              border: OutlineInputBorder(),
+              hintText: 'Comece a digitar, ex.: Sol Ri...',
+              prefixIcon: const Icon(Icons.search),
+              suffixIcon: _controller.text.isEmpty
+                  ? null
+                  : IconButton(
+                      tooltip: 'Limpar',
+                      onPressed: () {
+                        _controller.clear();
+                        setState(() => _suggestions = const []);
+                      },
+                      icon: const Icon(Icons.clear),
+                    ),
+              border: const OutlineInputBorder(),
             ),
           ),
+          if (_loadingSuggestions) ...[
+            const SizedBox(height: 8),
+            const LinearProgressIndicator(),
+          ],
+          if (_suggestions.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Card(
+              clipBehavior: Clip.antiAlias,
+              child: Column(
+                children: _suggestions
+                    .map(
+                      (name) => ListTile(
+                        dense: true,
+                        leading: const Icon(Icons.auto_awesome),
+                        title: Text(name),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _selectSuggestion(name),
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+            ),
+          ],
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => context.push('/scanner'),
@@ -70,7 +155,7 @@ class _SearchPageState extends State<SearchPage> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'O ManaPrice busca a carta pelo nome, mostra a imagem e usa o menor preço real retornado pela LigaMagic. Depois você aplica o desconto e copia a mensagem para enviar.',
+            'Digite só algumas letras e toque na carta certa. Depois o ManaPrice mostra a imagem, busca o menor preço retornado pela LigaMagic e permite aplicar o desconto.',
             textAlign: TextAlign.center,
           ),
         ],
