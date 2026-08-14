@@ -13,25 +13,26 @@ class LigaMagicBrowserClient {
   Future<LigaMagicScrapeResult?> lookup(PriceLookupRequest request) async {
     if (kIsWeb) return null;
 
-    final direct = await _loadAndParse(
-      request,
-      LigaMagicUrlBuilder.card(request),
-    );
+    final directHtml = await _loadHtml(LigaMagicUrlBuilder.card(request));
+    final direct = _parse(request, directHtml);
     if (direct != null) return direct;
 
-    return _loadAndParse(
-      request,
-      LigaMagicUrlBuilder.search(request),
-    );
+    final searchHtml = await _loadHtml(LigaMagicUrlBuilder.search(request));
+    final parsedSearch = _parse(request, searchHtml);
+    if (parsedSearch != null) return parsedSearch;
+
+    final cardUri = _findCardPageUri(searchHtml, request.cardName);
+    if (cardUri == null) return null;
+
+    final cardHtml = await _loadHtml(cardUri);
+    return _parse(request, cardHtml);
   }
 
-  Future<LigaMagicScrapeResult?> _loadAndParse(
+  LigaMagicScrapeResult? _parse(
     PriceLookupRequest request,
-    Uri uri,
-  ) async {
-    final html = await _loadHtml(uri);
+    String? html,
+  ) {
     if (html == null || html.isEmpty) return null;
-
     return LigaMagicScrapeParser.parse(
       request: request,
       html: html,
@@ -63,7 +64,7 @@ class LigaMagicBrowserClient {
         ),
         onLoadStop: (controller, url) async {
           // A LigaMagic monta parte dos resultados depois do load inicial.
-          await Future<void>.delayed(const Duration(milliseconds: 900));
+          await Future<void>.delayed(const Duration(milliseconds: 1200));
           try {
             final html = await controller.getHtml();
             await finish(html);
@@ -80,7 +81,7 @@ class LigaMagicBrowserClient {
 
       await webView.run();
       return await completer.future.timeout(
-        const Duration(seconds: 22),
+        const Duration(seconds: 24),
         onTimeout: () => null,
       );
     } catch (_) {
@@ -90,5 +91,40 @@ class LigaMagicBrowserClient {
         await webView?.dispose();
       } catch (_) {}
     }
+  }
+
+  static Uri? _findCardPageUri(String? html, String cardName) {
+    if (html == null || html.isEmpty) return null;
+
+    final target = _frontFace(cardName).toLowerCase();
+    final linkPattern = RegExp(
+      r'href="([^"]*\?view=cards/card&amp;card=[^"]+|[^"]*\?view=cards/card&card=[^"]+)"',
+      caseSensitive: false,
+    );
+
+    Uri? firstCardUri;
+    for (final match in linkPattern.allMatches(html)) {
+      final rawHref = match.group(1);
+      if (rawHref == null) continue;
+
+      final decodedHref = rawHref.replaceAll('&amp;', '&');
+      final absolute = decodedHref.startsWith('http')
+          ? decodedHref
+          : 'https://www.ligamagic.com.br/${decodedHref.startsWith('/') ? decodedHref.substring(1) : decodedHref}';
+      final uri = Uri.tryParse(absolute);
+      if (uri == null) continue;
+      firstCardUri ??= uri;
+
+      final candidate = uri.queryParameters['card'];
+      if (candidate == null) continue;
+      if (_frontFace(candidate).toLowerCase() == target) return uri;
+    }
+
+    return firstCardUri;
+  }
+
+  static String _frontFace(String name) {
+    final index = name.indexOf(' // ');
+    return (index >= 0 ? name.substring(0, index) : name).trim();
   }
 }
