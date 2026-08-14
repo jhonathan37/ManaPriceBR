@@ -19,9 +19,8 @@ class LigaMagicScrapeParser {
     required PriceLookupRequest request,
     required String html,
   }) {
-    final structuredPrices = _extractCardsJsonMinimumPrices(
-      html,
-      request.cardName,
+    final structuredPrices = List<double>.of(
+      _extractCardsJsonMinimumPrices(html, request.cardName),
     )..sort();
 
     final visible = _parseVisibleHtml(request: request, html: html);
@@ -61,10 +60,6 @@ class LigaMagicScrapeParser {
     final smaller = structured < visible ? structured : visible;
     final ratio = larger / smaller;
 
-    // Quando as duas leituras da mesma página divergem por uma ordem de
-    // grandeza, não usamos automaticamente o menor valor. Esse cenário já
-    // ocorreu em páginas em que um número interno como 4.95 não representava
-    // a oferta visível de R$ 495,00.
     if (ratio >= 10) return visible;
 
     return smaller;
