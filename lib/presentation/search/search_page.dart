@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../data/datasources/scryfall_catalog_client.dart';
+import '../../domain/entities/card_printing.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key, this.initialName});
@@ -19,7 +20,12 @@ class _SearchPageState extends State<SearchPage> {
   final ScryfallCatalogClient _catalog = ScryfallCatalogClient();
   Timer? _debounce;
   List<String> _suggestions = const [];
+  List<CardPrinting> _printings = const [];
+  CardPrinting? _selectedPrinting;
   bool _loadingSuggestions = false;
+  bool _loadingPrintings = false;
+  bool _foil = false;
+  String _condition = 'NM';
 
   @override
   void initState() {
@@ -37,6 +43,10 @@ class _SearchPageState extends State<SearchPage> {
   void _onChanged(String value) {
     _debounce?.cancel();
     final query = value.trim();
+    setState(() {
+      _selectedPrinting = null;
+      _printings = const [];
+    });
 
     if (query.length < 2) {
       setState(() {
@@ -67,14 +77,39 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 
+  Future<void> _loadPrintings(String name) async {
+    setState(() {
+      _loadingPrintings = true;
+      _selectedPrinting = null;
+      _printings = const [];
+    });
+    try {
+      final items = await _catalog.printings(name);
+      if (!mounted || _controller.text.trim() != name) return;
+      setState(() {
+        _printings = items;
+        _loadingPrintings = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loadingPrintings = false);
+    }
+  }
+
   void _selectSuggestion(String name) {
     _controller.text = name;
     _controller.selection = TextSelection.collapsed(offset: name.length);
     setState(() => _suggestions = const []);
-    _search();
+    _loadPrintings(name);
   }
 
-  void _search() {
+  Future<void> _ensurePrintings() async {
+    final name = _controller.text.trim();
+    if (name.isEmpty || _printings.isNotEmpty || _loadingPrintings) return;
+    await _loadPrintings(name);
+  }
+
+  Future<void> _search() async {
     final name = _controller.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -83,9 +118,21 @@ class _SearchPageState extends State<SearchPage> {
       return;
     }
 
+    await _ensurePrintings();
+    if (!mounted) return;
+
     FocusScope.of(context).unfocus();
     setState(() => _suggestions = const []);
-    context.push('/result', extra: {'name': name});
+    final printing = _selectedPrinting;
+    context.push('/result', extra: {
+      'name': name,
+      'setCode': printing?.setCode,
+      'setName': printing?.setName,
+      'collectorNumber': printing?.collectorNumber,
+      'condition': _condition,
+      'foil': _foil,
+      'language': 'Português',
+    });
   }
 
   @override
@@ -111,7 +158,11 @@ class _SearchPageState extends State<SearchPage> {
                       tooltip: 'Limpar',
                       onPressed: () {
                         _controller.clear();
-                        setState(() => _suggestions = const []);
+                        setState(() {
+                          _suggestions = const [];
+                          _printings = const [];
+                          _selectedPrinting = null;
+                        });
                       },
                       icon: const Icon(Icons.clear),
                     ),
@@ -141,6 +192,74 @@ class _SearchPageState extends State<SearchPage> {
               ),
             ),
           ],
+          const SizedBox(height: 16),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Mais filtros'),
+            subtitle: const Text('Edição, condição e acabamento'),
+            children: [
+              if (_loadingPrintings) const LinearProgressIndicator(),
+              DropdownButtonFormField<String?>(
+                value: _selectedPrinting?.id,
+                decoration: const InputDecoration(
+                  labelText: 'Edição',
+                  border: OutlineInputBorder(),
+                ),
+                items: [
+                  const DropdownMenuItem<String?>(
+                    value: null,
+                    child: Text('Qualquer edição'),
+                  ),
+                  ..._printings.map(
+                    (printing) => DropdownMenuItem<String?>(
+                      value: printing.id,
+                      child: Text(
+                        printing.label,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
+                onChanged: (id) {
+                  setState(() {
+                    _selectedPrinting = id == null
+                        ? null
+                        : _printings.firstWhere((p) => p.id == id);
+                    if (_selectedPrinting != null &&
+                        !_selectedPrinting!.foilAvailable) {
+                      _foil = false;
+                    }
+                  });
+                },
+              ),
+              const SizedBox(height: 12),
+              DropdownButtonFormField<String>(
+                value: _condition,
+                decoration: const InputDecoration(
+                  labelText: 'Condição',
+                  border: OutlineInputBorder(),
+                ),
+                items: const [
+                  DropdownMenuItem(value: 'NM', child: Text('NM')),
+                  DropdownMenuItem(value: 'SP', child: Text('SP')),
+                  DropdownMenuItem(value: 'MP', child: Text('MP')),
+                  DropdownMenuItem(value: 'HP', child: Text('HP')),
+                  DropdownMenuItem(value: 'D', child: Text('Danificada')),
+                ],
+                onChanged: (value) => setState(() => _condition = value ?? 'NM'),
+              ),
+              SwitchListTile(
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Foil'),
+                subtitle: Text(_foil ? 'Buscar versão foil' : 'Buscar versão não foil'),
+                value: _foil,
+                onChanged: _selectedPrinting != null &&
+                        !_selectedPrinting!.foilAvailable
+                    ? null
+                    : (value) => setState(() => _foil = value),
+              ),
+            ],
+          ),
           const SizedBox(height: 12),
           OutlinedButton.icon(
             onPressed: () => context.push('/scanner'),
@@ -155,7 +274,7 @@ class _SearchPageState extends State<SearchPage> {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Digite só algumas letras e toque na carta certa. Depois o ManaPrice mostra a imagem, busca o menor preço retornado pela LigaMagic e permite aplicar o desconto.',
+            'Você pode buscar rápido só pelo nome ou abrir Mais filtros para escolher edição, condição e foil.',
             textAlign: TextAlign.center,
           ),
         ],
