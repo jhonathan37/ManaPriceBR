@@ -6,10 +6,12 @@ class LigaMagicScrapeResult {
   const LigaMagicScrapeResult({
     required this.response,
     required this.imageUrl,
+    required this.visuallyVerified,
   });
 
   final PriceLookupResponse response;
   final String? imageUrl;
+  final bool visuallyVerified;
 }
 
 class LigaMagicScrapeParser {
@@ -36,6 +38,7 @@ class LigaMagicScrapeParser {
           sourceName: 'Liga Magic',
         ),
         imageUrl: _extractImage(html),
+        visuallyVerified: false,
       );
     }
 
@@ -49,6 +52,7 @@ class LigaMagicScrapeParser {
         sourceName: 'Liga Magic',
       ),
       imageUrl: visible.imageUrl ?? _extractImage(html),
+      visuallyVerified: true,
     );
   }
 
@@ -97,6 +101,7 @@ class LigaMagicScrapeParser {
         sourceName: 'Liga Magic',
       ),
       imageUrl: imageUrl,
+      visuallyVerified: true,
     );
   }
 
