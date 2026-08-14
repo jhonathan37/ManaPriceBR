@@ -29,6 +29,12 @@ class _ResultPageState extends State<ResultPage> {
     final item = await _provider.find(
       widget.filters['name'] as String? ?? '',
       discountPercent: _discount,
+      setCode: widget.filters['setCode'] as String?,
+      setName: widget.filters['setName'] as String?,
+      collectorNumber: widget.filters['collectorNumber'] as String?,
+      language: widget.filters['language'] as String? ?? 'Português',
+      condition: widget.filters['condition'] as String? ?? 'NM',
+      foil: widget.filters['foil'] as bool? ?? false,
     );
 
     if (!mounted) return;
@@ -77,6 +83,9 @@ class _ResultPageState extends State<ResultPage> {
   @override
   Widget build(BuildContext context) {
     final name = widget.filters['name'] as String? ?? 'Carta';
+    final setName = widget.filters['setName'] as String?;
+    final condition = widget.filters['condition'] as String? ?? 'NM';
+    final foil = widget.filters['foil'] as bool? ?? false;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Cotação da carta')),
@@ -118,6 +127,11 @@ class _ResultPageState extends State<ResultPage> {
                                   .textTheme
                                   .headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              '${setName ?? 'Qualquer edição'} • $condition • ${foil ? 'Foil' : 'Não foil'}',
+                              style: Theme.of(context).textTheme.bodyMedium,
                             ),
                             const SizedBox(height: 20),
                             if (_item!.priceAvailable) ...[
