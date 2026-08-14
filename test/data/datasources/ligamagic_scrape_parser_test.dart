@@ -47,6 +47,54 @@ void main() {
       expect(result!.response.referencePrice, 299.99);
     });
 
+    test('rejects a structured price that is 100x below the visible offer', () {
+      const html = '''
+        <html><body>
+          <script>
+            var cardsjson = [
+              {"nEN":"The Soul Stone","nPT":"The Soul Stone","p1a":"4.95"}
+            ];
+          </script>
+          <section>
+            <h1>The Soul Stone</h1>
+            <div>R\$ 495,00</div>
+          </section>
+        </body></html>
+      ''';
+
+      final result = LigaMagicScrapeParser.parse(
+        request: const PriceLookupRequest(cardName: 'The Soul Stone'),
+        html: html,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.response.referencePrice, 495.00);
+    });
+
+    test('keeps the true lower price when structured and visible values agree', () {
+      const html = '''
+        <html><body>
+          <script>
+            var cardsjson = [
+              {"nEN":"Tony Stark","nPT":"Tony Stark","p1a":"89,90"}
+            ];
+          </script>
+          <section>
+            <h1>Tony Stark</h1>
+            <div>R\$ 94,90</div>
+          </section>
+        </body></html>
+      ''';
+
+      final result = LigaMagicScrapeParser.parse(
+        request: const PriceLookupRequest(cardName: 'Tony Stark'),
+        html: html,
+      );
+
+      expect(result, isNotNull);
+      expect(result!.response.referencePrice, 89.90);
+    });
+
     test('ignores unrelated prices far from the requested card block', () {
       const html = '''
         <html><body>
