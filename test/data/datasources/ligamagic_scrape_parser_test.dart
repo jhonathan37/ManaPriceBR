@@ -4,7 +4,7 @@ import 'package:manaprice_br/data/datasources/price_source.dart';
 
 void main() {
   group('LigaMagicScrapeParser', () {
-    test('reads the lowest price from LigaMagic cardsjson', () {
+    test('reads cardsjson price but marks it unverified without visible offer', () {
       const html = '''
         <html><body>
           <script>
@@ -24,6 +24,7 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.response.referencePrice, 9.90);
+      expect(result.visuallyVerified, isFalse);
     });
 
     test('returns the lowest BRL price near the requested card name', () {
@@ -45,6 +46,7 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.response.referencePrice, 299.99);
+      expect(result.visuallyVerified, isTrue);
     });
 
     test('rejects a structured price that is 100x below the visible offer', () {
@@ -69,6 +71,7 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.response.referencePrice, 495.00);
+      expect(result.visuallyVerified, isTrue);
     });
 
     test('keeps the true lower price when structured and visible values agree', () {
@@ -93,6 +96,7 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.response.referencePrice, 89.90);
+      expect(result.visuallyVerified, isTrue);
     });
 
     test('ignores unrelated prices far from the requested card block', () {
@@ -114,6 +118,7 @@ void main() {
 
       expect(result, isNotNull);
       expect(result!.response.referencePrice, 9.90);
+      expect(result.visuallyVerified, isTrue);
     });
 
     test('returns null when no BRL price is found for the card', () {
