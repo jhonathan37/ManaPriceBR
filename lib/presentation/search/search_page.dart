@@ -200,7 +200,7 @@ class _SearchPageState extends State<SearchPage> {
             children: [
               if (_loadingPrintings) const LinearProgressIndicator(),
               DropdownButtonFormField<String?>(
-                value: _selectedPrinting?.id,
+                initialValue: _selectedPrinting?.id,
                 decoration: const InputDecoration(
                   labelText: 'Edição',
                   border: OutlineInputBorder(),
@@ -234,7 +234,7 @@ class _SearchPageState extends State<SearchPage> {
               ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
-                value: _condition,
+                initialValue: _condition,
                 decoration: const InputDecoration(
                   labelText: 'Condição',
                   border: OutlineInputBorder(),
