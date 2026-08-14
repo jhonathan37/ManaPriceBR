@@ -16,7 +16,7 @@ class LigaMagicScrapeClient {
       request,
       LigaMagicUrlBuilder.card(request),
     );
-    if (direct != null) return direct;
+    if (direct?.visuallyVerified == true) return direct;
 
     final searchHtml = await _fetchHtml(LigaMagicUrlBuilder.search(request));
     if (searchHtml == null) return null;
@@ -25,12 +25,13 @@ class LigaMagicScrapeClient {
       request: request,
       html: searchHtml,
     );
-    if (parsedFromSearch != null) return parsedFromSearch;
+    if (parsedFromSearch?.visuallyVerified == true) return parsedFromSearch;
 
     final cardUri = _findCardPageUri(searchHtml, request.cardName);
     if (cardUri == null) return null;
 
-    return _fetchAndParse(request, cardUri);
+    final cardResult = await _fetchAndParse(request, cardUri);
+    return cardResult?.visuallyVerified == true ? cardResult : null;
   }
 
   Future<LigaMagicScrapeResult?> _fetchAndParse(
