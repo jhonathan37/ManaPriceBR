@@ -20,6 +20,12 @@ class CardPriceProvider {
   Future<SaleItem?> find(
     String cardName, {
     double discountPercent = 20,
+    String? setCode,
+    String? setName,
+    String? collectorNumber,
+    String language = 'Português',
+    String condition = 'NM',
+    bool foil = false,
   }) async {
     final normalized = cardName.trim();
     if (normalized.isEmpty) return null;
@@ -35,7 +41,15 @@ class CardPriceProvider {
       }
     } catch (_) {}
 
-    final request = PriceLookupRequest(cardName: canonicalName);
+    final request = PriceLookupRequest(
+      cardName: canonicalName,
+      setCode: setCode,
+      setName: setName,
+      collectorNumber: collectorNumber,
+      language: language,
+      condition: condition,
+      foil: foil,
+    );
 
     try {
       final result = await _client.lookup(request);
@@ -49,9 +63,6 @@ class CardPriceProvider {
       }
     } catch (_) {}
 
-    // A LigaMagic pode bloquear requests HTTP diretos (403/anti-bot).
-    // No aparelho, tentamos novamente dentro de um WebView real, preservando
-    // JavaScript, cookies e o mesmo contexto de navegação usado pelo site.
     try {
       final result = await _browserClient.lookup(request);
       if (result != null && result.response.referencePrice > 0) {
