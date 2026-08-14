@@ -22,21 +22,52 @@ class LigaMagicScrapeParser {
     final structuredPrices = _extractCardsJsonMinimumPrices(
       html,
       request.cardName,
-    );
+    )..sort();
 
-    if (structuredPrices.isNotEmpty) {
-      structuredPrices.sort();
+    final visible = _parseVisibleHtml(request: request, html: html);
+    final structured = structuredPrices.isEmpty ? null : structuredPrices.first;
+
+    if (structured == null) return visible;
+
+    if (visible == null) {
       return LigaMagicScrapeResult(
         response: PriceLookupResponse(
           cardName: request.cardName,
-          referencePrice: structuredPrices.first,
+          referencePrice: structured,
           sourceName: 'Liga Magic',
         ),
         imageUrl: _extractImage(html),
       );
     }
 
-    return _parseVisibleHtml(request: request, html: html);
+    final visiblePrice = visible.response.referencePrice;
+    final chosen = _reconcilePrices(structured, visiblePrice);
+
+    return LigaMagicScrapeResult(
+      response: PriceLookupResponse(
+        cardName: request.cardName,
+        referencePrice: chosen,
+        sourceName: 'Liga Magic',
+      ),
+      imageUrl: visible.imageUrl ?? _extractImage(html),
+    );
+  }
+
+  static double _reconcilePrices(double structured, double visible) {
+    if (structured <= 0) return visible;
+    if (visible <= 0) return structured;
+
+    final larger = structured > visible ? structured : visible;
+    final smaller = structured < visible ? structured : visible;
+    final ratio = larger / smaller;
+
+    // Quando as duas leituras da mesma página divergem por uma ordem de
+    // grandeza, não usamos automaticamente o menor valor. Esse cenário já
+    // ocorreu em páginas em que um número interno como 4.95 não representava
+    // a oferta visível de R$ 495,00.
+    if (ratio >= 10) return visible;
+
+    return smaller;
   }
 
   static LigaMagicScrapeResult? _parseVisibleHtml({
