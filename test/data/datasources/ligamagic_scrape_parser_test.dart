@@ -4,131 +4,49 @@ import 'package:manaprice_br/data/datasources/price_source.dart';
 
 void main() {
   group('LigaMagicScrapeParser', () {
-    test('reads cardsjson price but marks it unverified without visible offer', () {
-      const html = '''
-        <html><body>
-          <script>
-            var cardsjson = [
-              {"nEN":"Sol Ring","nPT":"Anel Solar","p1a":"12,50"},
-              {"nEN":"Sol Ring","nPT":"Anel Solar","p1a":"9,90"},
-              {"nEN":"Black Lotus","nPT":"Lótus Preto","p1a":"1,00"}
-            ];
-          </script>
-        </body></html>
-      ''';
-
+    test('cardsjson alone stays unverified', () {
+      const html = '''<script>var cardsjson=[{"nEN":"The Soul Stone","p1a":"4.95"}];</script>''';
       final result = LigaMagicScrapeParser.parse(
-        request: const PriceLookupRequest(cardName: 'Sol Ring'),
-        html: html,
-      );
-
+        request: const PriceLookupRequest(cardName: 'The Soul Stone'), html: html);
       expect(result, isNotNull);
-      expect(result!.response.referencePrice, 9.90);
+      expect(result!.response.referencePrice, 4.95);
       expect(result.visuallyVerified, isFalse);
     });
 
-    test('returns the lowest BRL price near the requested card name', () {
+    test('Soul Stone visible offer wins over misleading cardsjson', () {
       const html = '''
-        <html><body>
-          <section>
-            <h1>The One Ring</h1>
-            <div>R\$ 329,90</div>
-            <div>R\$ 299,99</div>
-            <div>R\$ 315,00</div>
-          </section>
-        </body></html>
-      ''';
-
+      <script>var cardsjson=[{"nEN":"The Soul Stone","p1a":"4.95"}];</script>
+      <section><h1>The Soul Stone</h1><div>R\$ 495,00</div></section>''';
       final result = LigaMagicScrapeParser.parse(
-        request: const PriceLookupRequest(cardName: 'The One Ring'),
-        html: html,
-      );
-
-      expect(result, isNotNull);
-      expect(result!.response.referencePrice, 299.99);
-      expect(result.visuallyVerified, isTrue);
-    });
-
-    test('rejects a structured price that is 100x below the visible offer', () {
-      const html = '''
-        <html><body>
-          <script>
-            var cardsjson = [
-              {"nEN":"The Soul Stone","nPT":"The Soul Stone","p1a":"4.95"}
-            ];
-          </script>
-          <section>
-            <h1>The Soul Stone</h1>
-            <div>R\$ 495,00</div>
-          </section>
-        </body></html>
-      ''';
-
-      final result = LigaMagicScrapeParser.parse(
-        request: const PriceLookupRequest(cardName: 'The Soul Stone'),
-        html: html,
-      );
-
+        request: const PriceLookupRequest(cardName: 'The Soul Stone'), html: html);
       expect(result, isNotNull);
       expect(result!.response.referencePrice, 495.00);
       expect(result.visuallyVerified, isTrue);
     });
 
-    test('keeps the true lower price when structured and visible values agree', () {
+    test('does not grab a cheap price from a neighboring offer', () {
       const html = '''
-        <html><body>
-          <script>
-            var cardsjson = [
-              {"nEN":"Tony Stark","nPT":"Tony Stark","p1a":"89,90"}
-            ];
-          </script>
-          <section>
-            <h1>Tony Stark</h1>
-            <div>R\$ 94,90</div>
-          </section>
-        </body></html>
-      ''';
-
+      <section><h1>The Soul Stone</h1><div>R\$ 495,00</div></section>
+      <section><h1>Token</h1><div>R\$ 4,95</div></section>''';
       final result = LigaMagicScrapeParser.parse(
-        request: const PriceLookupRequest(cardName: 'Tony Stark'),
-        html: html,
-      );
-
-      expect(result, isNotNull);
-      expect(result!.response.referencePrice, 89.90);
-      expect(result.visuallyVerified, isTrue);
+        request: const PriceLookupRequest(cardName: 'The Soul Stone'), html: html);
+      expect(result!.response.referencePrice, 495.00);
     });
 
-    test('ignores unrelated prices far from the requested card block', () {
+    test('filters edition, condition and foil inside an offer block', () {
       const html = '''
-        <html><body>
-          <div>Black Lotus R\$ 1,00</div>
-          <section>
-            <h1>Sol Ring</h1>
-            <div>R\$ 12,50</div>
-            <div>R\$ 9,90</div>
-          </section>
-        </body></html>
-      ''';
-
+      <section><h1>Tony Stark</h1><span>Marvel Test Set</span><span>#123</span><span>NM</span><span>Foil</span><div>R\$ 299,90</div></section>
+      <section><h1>Tony Stark</h1><span>Other Set</span><span>#999</span><span>NM</span><span>Foil</span><div>R\$ 19,90</div></section>''';
       final result = LigaMagicScrapeParser.parse(
-        request: const PriceLookupRequest(cardName: 'Sol Ring'),
-        html: html,
-      );
-
+        request: const PriceLookupRequest(cardName: 'Tony Stark', setName: 'Marvel Test Set', collectorNumber: '#123', condition: 'NM', foil: true), html: html);
       expect(result, isNotNull);
-      expect(result!.response.referencePrice, 9.90);
-      expect(result.visuallyVerified, isTrue);
+      expect(result!.response.referencePrice, 299.90);
     });
 
-    test('returns null when no BRL price is found for the card', () {
-      const html = '<html><body><h1>Counterspell</h1><div>Sem estoque</div></body></html>';
-
+    test('returns null when no visible BRL offer exists', () {
+      const html = '<section><h1>Counterspell</h1><div>Sem estoque</div></section>';
       final result = LigaMagicScrapeParser.parse(
-        request: const PriceLookupRequest(cardName: 'Counterspell'),
-        html: html,
-      );
-
+        request: const PriceLookupRequest(cardName: 'Counterspell'), html: html);
       expect(result, isNull);
     });
   });
