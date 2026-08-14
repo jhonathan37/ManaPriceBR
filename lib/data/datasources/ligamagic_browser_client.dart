@@ -15,17 +15,18 @@ class LigaMagicBrowserClient {
 
     final directHtml = await _loadHtml(LigaMagicUrlBuilder.card(request));
     final direct = _parse(request, directHtml);
-    if (direct != null) return direct;
+    if (direct?.visuallyVerified == true) return direct;
 
     final searchHtml = await _loadHtml(LigaMagicUrlBuilder.search(request));
     final parsedSearch = _parse(request, searchHtml);
-    if (parsedSearch != null) return parsedSearch;
+    if (parsedSearch?.visuallyVerified == true) return parsedSearch;
 
     final cardUri = _findCardPageUri(searchHtml, request.cardName);
     if (cardUri == null) return null;
 
     final cardHtml = await _loadHtml(cardUri);
-    return _parse(request, cardHtml);
+    final cardResult = _parse(request, cardHtml);
+    return cardResult?.visuallyVerified == true ? cardResult : null;
   }
 
   LigaMagicScrapeResult? _parse(
@@ -63,8 +64,7 @@ class LigaMagicBrowserClient {
               '(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
         ),
         onLoadStop: (controller, url) async {
-          // A LigaMagic monta parte dos resultados depois do load inicial.
-          await Future<void>.delayed(const Duration(milliseconds: 1200));
+          await Future<void>.delayed(const Duration(milliseconds: 1800));
           try {
             final html = await controller.getHtml();
             await finish(html);
