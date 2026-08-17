@@ -23,6 +23,7 @@ class CardPriceProvider {
     String? setCode,
     String? setName,
     String? collectorNumber,
+    String? imageUrl,
     String language = 'Português',
     String condition = 'NM',
     bool foil = false,
@@ -31,13 +32,13 @@ class CardPriceProvider {
     if (normalized.isEmpty) return null;
 
     String canonicalName = normalized;
-    String? catalogImage;
+    String? catalogImage = imageUrl;
 
     try {
       final catalogCard = await _catalogClient.find(normalized);
       if (catalogCard != null) {
         canonicalName = catalogCard.name;
-        catalogImage = catalogCard.imageUrl;
+        catalogImage ??= catalogCard.imageUrl;
       }
     } catch (_) {}
 
@@ -54,24 +55,14 @@ class CardPriceProvider {
     try {
       final result = await _client.lookup(request);
       if (result != null && result.response.referencePrice > 0) {
-        return _toSaleItem(
-          canonicalName,
-          catalogImage,
-          discountPercent,
-          result,
-        );
+        return _toSaleItem(canonicalName, catalogImage, discountPercent, result);
       }
     } catch (_) {}
 
     try {
       final result = await _browserClient.lookup(request);
       if (result != null && result.response.referencePrice > 0) {
-        return _toSaleItem(
-          canonicalName,
-          catalogImage,
-          discountPercent,
-          result,
-        );
+        return _toSaleItem(canonicalName, catalogImage, discountPercent, result);
       }
     } catch (_) {}
 
@@ -95,7 +86,7 @@ class CardPriceProvider {
       cardName: canonicalName,
       referencePrice: result.response.referencePrice,
       discountPercent: discountPercent,
-      imageUrl: catalogImage ?? result.imageUrl,
+      imageUrl: result.imageUrl ?? catalogImage,
       priceAvailable: true,
       sourceName: result.response.sourceName,
     );
