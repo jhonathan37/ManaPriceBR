@@ -32,6 +32,7 @@ class _ResultPageState extends State<ResultPage> {
       setCode: widget.filters['setCode'] as String?,
       setName: widget.filters['setName'] as String?,
       collectorNumber: widget.filters['collectorNumber'] as String?,
+      imageUrl: widget.filters['imageUrl'] as String?,
       language: widget.filters['language'] as String? ?? 'Português',
       condition: widget.filters['condition'] as String? ?? 'NM',
       foil: widget.filters['foil'] as bool? ?? false,
@@ -143,50 +144,38 @@ class _ResultPageState extends State<ResultPage> {
                                     .headlineMedium
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),
-                              const SizedBox(height: 24),
+                              const SizedBox(height: 18),
                               Text('Desconto: ${_discount.toStringAsFixed(0)}%'),
                               Slider(
                                 value: _discount,
                                 min: 0,
-                                max: 100,
-                                divisions: 20,
+                                max: 50,
+                                divisions: 50,
                                 label: '${_discount.toStringAsFixed(0)}%',
                                 onChanged: _setDiscount,
                               ),
-                              const SizedBox(height: 12),
-                              const Text('Valor final para enviar'),
                               Text(
-                                _money(_item!.finalValue),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .headlineMedium
-                                    ?.copyWith(fontWeight: FontWeight.bold),
-                              ),
-                            ] else ...[
-                              Text(
-                                'Não foi possível obter o preço da LigaMagic agora.',
+                                'Valor final: ${_money(_item!.finalValue)}',
                                 style: Theme.of(context)
                                     .textTheme
                                     .titleLarge
                                     ?.copyWith(fontWeight: FontWeight.bold),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 16),
+                              FilledButton.icon(
+                                onPressed: _copyMessage,
+                                icon: const Icon(Icons.copy),
+                                label: const Text('Copiar mensagem'),
+                              ),
+                            ] else ...[
                               const Text(
-                                'A carta foi localizada, mas o app não inventa um valor quando a fonte real não responde.',
+                                'Preço não confirmado na LigaMagic para esses filtros.',
                               ),
                             ],
                           ],
                         ),
                       ),
                     ),
-                    if (_item!.priceAvailable) ...[
-                      const SizedBox(height: 16),
-                      FilledButton.icon(
-                        onPressed: _copyMessage,
-                        icon: const Icon(Icons.copy),
-                        label: const Text('Copiar mensagem para enviar'),
-                      ),
-                    ],
                   ],
                 ),
     );
