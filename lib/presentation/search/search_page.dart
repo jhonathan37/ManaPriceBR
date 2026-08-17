@@ -59,7 +59,6 @@ class _SearchPageState extends State<SearchPage> {
     _debounce = Timer(const Duration(milliseconds: 350), () async {
       if (!mounted) return;
       setState(() => _loadingSuggestions = true);
-
       try {
         final items = await _catalog.autocomplete(query);
         if (!mounted || _controller.text.trim() != query) return;
@@ -129,6 +128,7 @@ class _SearchPageState extends State<SearchPage> {
       'setCode': printing?.setCode,
       'setName': printing?.setName,
       'collectorNumber': printing?.collectorNumber,
+      'imageUrl': printing?.imageUrl,
       'condition': _condition,
       'foil': _foil,
       'language': 'Português',
@@ -188,94 +188,66 @@ class _SearchPageState extends State<SearchPage> {
                         onTap: () => _selectSuggestion(name),
                       ),
                     )
-                    .toList(growable: false),
+                    .toList(),
               ),
             ),
           ],
           const SizedBox(height: 16),
           ExpansionTile(
-            tilePadding: EdgeInsets.zero,
             title: const Text('Mais filtros'),
-            subtitle: const Text('Edição, condição e acabamento'),
+            subtitle: Text(
+              '${_selectedPrinting?.setName ?? 'Qualquer edição'} • $_condition • ${_foil ? 'Foil' : 'Não foil'}',
+            ),
+            onExpansionChanged: (expanded) {
+              if (expanded) _ensurePrintings();
+            },
             children: [
-              if (_loadingPrintings) const LinearProgressIndicator(),
-              DropdownButtonFormField<String?>(
-                initialValue: _selectedPrinting?.id,
-                decoration: const InputDecoration(
-                  labelText: 'Edição',
-                  border: OutlineInputBorder(),
-                ),
-                items: [
-                  const DropdownMenuItem<String?>(
-                    value: null,
-                    child: Text('Qualquer edição'),
-                  ),
-                  ..._printings.map(
-                    (printing) => DropdownMenuItem<String?>(
-                      value: printing.id,
-                      child: Text(
-                        printing.label,
-                        overflow: TextOverflow.ellipsis,
+              if (_loadingPrintings)
+                const Padding(
+                  padding: EdgeInsets.all(12),
+                  child: LinearProgressIndicator(),
+                )
+              else if (_printings.isNotEmpty)
+                DropdownButtonFormField<CardPrinting?>(
+                  initialValue: _selectedPrinting,
+                  decoration: const InputDecoration(labelText: 'Edição'),
+                  items: [
+                    const DropdownMenuItem<CardPrinting?>(
+                      value: null,
+                      child: Text('Qualquer edição'),
+                    ),
+                    ..._printings.map(
+                      (p) => DropdownMenuItem<CardPrinting?>(
+                        value: p,
+                        child: Text(p.label, overflow: TextOverflow.ellipsis),
                       ),
                     ),
-                  ),
-                ],
-                onChanged: (id) {
-                  setState(() {
-                    _selectedPrinting = id == null
-                        ? null
-                        : _printings.firstWhere((p) => p.id == id);
-                    if (_selectedPrinting != null &&
-                        !_selectedPrinting!.foilAvailable) {
-                      _foil = false;
-                    }
-                  });
-                },
-              ),
+                  ],
+                  onChanged: (value) => setState(() => _selectedPrinting = value),
+                ),
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _condition,
-                decoration: const InputDecoration(
-                  labelText: 'Condição',
-                  border: OutlineInputBorder(),
-                ),
-                items: const [
-                  DropdownMenuItem(value: 'NM', child: Text('NM')),
-                  DropdownMenuItem(value: 'SP', child: Text('SP')),
-                  DropdownMenuItem(value: 'MP', child: Text('MP')),
-                  DropdownMenuItem(value: 'HP', child: Text('HP')),
-                  DropdownMenuItem(value: 'D', child: Text('Danificada')),
-                ],
-                onChanged: (value) => setState(() => _condition = value ?? 'NM'),
+                decoration: const InputDecoration(labelText: 'Condição'),
+                items: const ['NM', 'SP', 'MP', 'HP', 'DMG']
+                    .map((value) => DropdownMenuItem(value: value, child: Text(value)))
+                    .toList(),
+                onChanged: (value) {
+                  if (value != null) setState(() => _condition = value);
+                },
               ),
               SwitchListTile(
-                contentPadding: EdgeInsets.zero,
                 title: const Text('Foil'),
-                subtitle: Text(_foil ? 'Buscar versão foil' : 'Buscar versão não foil'),
                 value: _foil,
-                onChanged: _selectedPrinting != null &&
-                        !_selectedPrinting!.foilAvailable
-                    ? null
-                    : (value) => setState(() => _foil = value),
+                onChanged: (value) => setState(() => _foil = value),
               ),
             ],
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: () => context.push('/scanner'),
-            icon: const Icon(Icons.photo_camera_outlined),
-            label: const Text('Ler nome pela câmera'),
           ),
           const SizedBox(height: 20),
           FilledButton.icon(
             onPressed: _search,
-            icon: const Icon(Icons.currency_exchange),
-            label: const Text('Buscar menor preço real'),
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'Você pode buscar rápido só pelo nome ou abrir Mais filtros para escolher edição, condição e foil.',
-            textAlign: TextAlign.center,
+            icon: const Icon(Icons.price_check),
+            label: const Text('Buscar preço na LigaMagic'),
           ),
         ],
       ),
