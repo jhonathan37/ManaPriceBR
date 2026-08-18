@@ -111,14 +111,10 @@ class _ResultPageState extends State<ResultPage> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            if (_item!.imageUrl != null && _item!.imageUrl!.isNotEmpty) ...[
+                            if (_item!.imageUrl != null &&
+                                _item!.imageUrl!.trim().isNotEmpty) ...[
                               Center(
-                                child: Image.network(
-                                  _item!.imageUrl!,
-                                  height: 280,
-                                  fit: BoxFit.contain,
-                                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-                                ),
+                                child: _CardImage(url: _item!.imageUrl!),
                               ),
                               const SizedBox(height: 16),
                             ],
@@ -178,6 +174,101 @@ class _ResultPageState extends State<ResultPage> {
                     ),
                   ],
                 ),
+    );
+  }
+}
+
+class _CardImage extends StatefulWidget {
+  const _CardImage({required this.url});
+
+  final String url;
+
+  @override
+  State<_CardImage> createState() => _CardImageState();
+}
+
+class _CardImageState extends State<_CardImage> {
+  late String _currentUrl;
+  bool _retried = false;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _currentUrl = widget.url.trim();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CardImage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _currentUrl = widget.url.trim();
+      _retried = false;
+      _failed = false;
+    }
+  }
+
+  String? _fallbackUrl(String url) {
+    if (url.contains('/normal/')) {
+      return url.replaceFirst('/normal/', '/small/');
+    }
+    if (url.contains('normal=')) {
+      return url.replaceFirst('normal=', 'small=');
+    }
+    return null;
+  }
+
+  void _handleError() {
+    final fallback = _fallbackUrl(_currentUrl);
+    if (!_retried && fallback != null && fallback != _currentUrl) {
+      setState(() {
+        _retried = true;
+        _currentUrl = fallback;
+      });
+      return;
+    }
+    setState(() => _failed = true);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_failed) {
+      return const SizedBox(
+        height: 280,
+        child: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.image_not_supported_outlined, size: 48),
+              SizedBox(height: 8),
+              Text('Imagem indisponível para esta impressão.'),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return Image.network(
+      _currentUrl,
+      key: ValueKey(_currentUrl),
+      height: 280,
+      fit: BoxFit.contain,
+      loadingBuilder: (context, child, progress) {
+        if (progress == null) return child;
+        return const SizedBox(
+          height: 280,
+          child: Center(child: CircularProgressIndicator()),
+        );
+      },
+      errorBuilder: (_, __, ___) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) _handleError();
+        });
+        return const SizedBox(
+          height: 280,
+          child: Center(child: CircularProgressIndicator()),
+        );
+      },
     );
   }
 }
