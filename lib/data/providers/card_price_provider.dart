@@ -32,13 +32,13 @@ class CardPriceProvider {
     if (normalized.isEmpty) return null;
 
     String canonicalName = normalized;
-    String? catalogImage = imageUrl;
+    String? catalogImage = _nonBlank(imageUrl);
 
     try {
       final catalogCard = await _catalogClient.find(normalized);
       if (catalogCard != null) {
         canonicalName = catalogCard.name;
-        catalogImage ??= catalogCard.imageUrl;
+        catalogImage ??= _nonBlank(catalogCard.imageUrl);
       }
     } catch (_) {}
 
@@ -86,9 +86,15 @@ class CardPriceProvider {
       cardName: canonicalName,
       referencePrice: result.response.referencePrice,
       discountPercent: discountPercent,
-      imageUrl: catalogImage ?? result.imageUrl,
+      imageUrl: catalogImage ?? _nonBlank(result.imageUrl),
       priceAvailable: true,
       sourceName: result.response.sourceName,
     );
+  }
+
+  static String? _nonBlank(String? value) {
+    if (value == null) return null;
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 }
