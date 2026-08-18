@@ -6,6 +6,10 @@ class SaleItem {
     this.imageUrl,
     this.priceAvailable = true,
     this.sourceName,
+    this.editionCode,
+    this.averagePrice,
+    this.maximumPrice,
+    this.priceVerified = false,
   });
 
   final String cardName;
@@ -14,6 +18,10 @@ class SaleItem {
   final String? imageUrl;
   final bool priceAvailable;
   final String? sourceName;
+  final String? editionCode;
+  final double? averagePrice;
+  final double? maximumPrice;
+  final bool priceVerified;
 
   double get finalValue => priceAvailable
       ? referencePrice * (1 - discountPercent.clamp(0, 100) / 100)
