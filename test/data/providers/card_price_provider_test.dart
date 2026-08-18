@@ -25,9 +25,13 @@ class _FakeCatalog extends ScryfallCatalogClient {
 class _FakeLigaClient extends LigaMagicScrapeClient {
   _FakeLigaClient({this.result});
   final LigaMagicScrapeResult? result;
+  PriceLookupRequest? lastRequest;
 
   @override
-  Future<LigaMagicScrapeResult?> lookup(PriceLookupRequest request) async => result;
+  Future<LigaMagicScrapeResult?> lookup(PriceLookupRequest request) async {
+    lastRequest = request;
+    return result;
+  }
 }
 
 class _FakeBrowserClient extends LigaMagicBrowserClient {
@@ -73,6 +77,44 @@ void main() {
       expect(item, isNotNull);
       expect(item!.referencePrice, 12.50);
       expect(item.imageUrl, 'https://catalog.example/eternal-witness.jpg');
+    });
+
+    test('Portuguese lookup keeps catalog image and LigaMagic price together', () async {
+      final liga = _FakeLigaClient(
+        result: LigaMagicScrapeResult(
+          response: const PriceLookupResponse(
+            cardName: 'Eternal Witness',
+            referencePrice: 27.90,
+          ),
+          imageUrl: null,
+          visuallyVerified: true,
+        ),
+      );
+      final provider = CardPriceProvider(
+        client: liga,
+        browserClient: const _FakeBrowserClient(),
+        catalogClient: _FakeCatalog(),
+      );
+
+      final item = await provider.find(
+        'Testemunha Eterna',
+        setCode: '2XM',
+        setName: 'Double Masters',
+        collectorNumber: '167',
+        condition: 'NM',
+        foil: false,
+      );
+
+      expect(item, isNotNull);
+      expect(item!.cardName, 'Eternal Witness');
+      expect(item.referencePrice, 27.90);
+      expect(item.imageUrl, 'https://catalog.example/eternal-witness.jpg');
+      expect(liga.lastRequest, isNotNull);
+      expect(liga.lastRequest!.cardName, 'Eternal Witness');
+      expect(liga.lastRequest!.setCode, '2XM');
+      expect(liga.lastRequest!.collectorNumber, '167');
+      expect(liga.lastRequest!.condition, 'NM');
+      expect(liga.lastRequest!.foil, isFalse);
     });
   });
 }
