@@ -86,7 +86,7 @@ class CardPriceProvider {
       cardName: canonicalName,
       referencePrice: result.response.referencePrice,
       discountPercent: discountPercent,
-      imageUrl: result.imageUrl ?? catalogImage,
+      imageUrl: catalogImage ?? result.imageUrl,
       priceAvailable: true,
       sourceName: result.response.sourceName,
     );
