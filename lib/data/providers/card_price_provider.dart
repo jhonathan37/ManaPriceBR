@@ -73,6 +73,7 @@ class CardPriceProvider {
       imageUrl: catalogImage,
       priceAvailable: false,
       sourceName: 'LigaMagic',
+      priceVerified: false,
     );
   }
 
@@ -89,6 +90,10 @@ class CardPriceProvider {
       imageUrl: catalogImage ?? _nonBlank(result.imageUrl),
       priceAvailable: true,
       sourceName: result.response.sourceName,
+      editionCode: result.editionCode,
+      averagePrice: result.averagePrice,
+      maximumPrice: result.maximumPrice,
+      priceVerified: result.visuallyVerified == true,
     );
   }
 
