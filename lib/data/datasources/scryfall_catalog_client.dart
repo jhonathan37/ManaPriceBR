@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:dio/dio.dart';
 
 import '../../domain/entities/card_printing.dart';
@@ -22,6 +24,14 @@ class ScryfallCatalogClient {
   static const _headers = {
     'User-Agent': 'ManaPriceBR/0.1 (card catalog lookup)',
     'Accept': 'application/json;q=0.9,*/*;q=0.8',
+  };
+
+  static const _ligaHeaders = {
+    'User-Agent':
+        'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
+        '(KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+    'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.7',
   };
 
   Future<List<String>> autocomplete(String query) async {
@@ -50,9 +60,7 @@ class ScryfallCatalogClient {
       }
     } catch (_) {}
 
-    // Multilingual fallback. Scryfall returns printed_name for localized cards.
-    // We intentionally filter client-side so "Testemunha Eterna" can resolve
-    // even though the canonical card name is Eternal Witness.
+    // Multilingual Scryfall attempt.
     try {
       final response = await _dio.get<Map<String, dynamic>>(
         'https://api.scryfall.com/cards/search',
@@ -60,7 +68,7 @@ class ScryfallCatalogClient {
           'q': name,
           'include_multilingual': true,
           'include_extras': true,
-          'unique': 'cards',
+          'unique': 'prints',
           'order': 'name',
         },
         options: _options,
@@ -90,6 +98,25 @@ class ScryfallCatalogClient {
       }
     } catch (_) {}
 
+    // LigaMagic fallback: its cardsjson exposes Portuguese (nPT) and English
+    // (nEN) names. This restores PT-BR suggestions when Scryfall search does
+    // not index a localized printed_name the way the user typed it.
+    try {
+      final ligaRows = await _ligaCardsJson(name);
+      final needle = _normalize(name);
+      for (final row in ligaRows) {
+        final pt = row['nPT']?.toString().trim();
+        final en = row['nEN']?.toString().trim();
+        if (pt != null && pt.isNotEmpty && _normalize(pt).contains(needle)) {
+          _addUnique(results, pt);
+        }
+        if (en != null && en.isNotEmpty && _normalize(en).contains(needle)) {
+          _addUnique(results, en);
+        }
+        if (results.length >= 8) break;
+      }
+    } catch (_) {}
+
     return results.take(8).toList(growable: false);
   }
 
@@ -109,8 +136,68 @@ class ScryfallCatalogClient {
       }
     } catch (_) {}
 
-    // Then resolve localized/printed names (Portuguese included).
-    return _findLocalized(name);
+    // Then resolve localized/printed names through Scryfall.
+    final localized = await _findLocalized(name);
+    if (localized != null) return localized;
+
+    // Finally ask LigaMagic to translate nPT -> nEN, then resolve that
+    // canonical name back through Scryfall so image/printing metadata stays
+    // consistent and independent from the price scraper.
+    try {
+      final ligaRows = await _ligaCardsJson(name);
+      final needle = _normalize(name);
+      Map<String, dynamic>? partial;
+      for (final row in ligaRows) {
+        final pt = row['nPT']?.toString().trim();
+        final en = row['nEN']?.toString().trim();
+        if (en == null || en.isEmpty) continue;
+        if (pt != null && _normalize(pt) == needle) {
+          final canonical = await _findCanonicalExact(en);
+          if (canonical != null) {
+            return ScryfallCatalogCard(
+              name: canonical.name,
+              displayName: pt,
+              imageUrl: canonical.imageUrl,
+            );
+          }
+        }
+        if (partial == null &&
+            ((pt != null && _normalize(pt).contains(needle)) ||
+                _normalize(en).contains(needle))) {
+          partial = row;
+        }
+      }
+      if (partial != null) {
+        final en = partial['nEN']?.toString().trim();
+        final pt = partial['nPT']?.toString().trim();
+        if (en != null && en.isNotEmpty) {
+          final canonical = await _findCanonicalExact(en);
+          if (canonical != null) {
+            return ScryfallCatalogCard(
+              name: canonical.name,
+              displayName: pt,
+              imageUrl: canonical.imageUrl,
+            );
+          }
+        }
+      }
+    } catch (_) {}
+
+    return null;
+  }
+
+  Future<ScryfallCatalogCard?> _findCanonicalExact(String name) async {
+    try {
+      final response = await _dio.get<Map<String, dynamic>>(
+        'https://api.scryfall.com/cards/named',
+        queryParameters: {'exact': name},
+        options: _options,
+      );
+      if (response.statusCode == 200 && response.data != null) {
+        return _cardFromJson(response.data!);
+      }
+    } catch (_) {}
+    return null;
   }
 
   Future<ScryfallCatalogCard?> _findLocalized(String query) async {
@@ -207,6 +294,34 @@ class ScryfallCatalogClient {
     return result;
   }
 
+  Future<List<Map<String, dynamic>>> _ligaCardsJson(String query) async {
+    try {
+      final response = await _dio.get<String>(
+        'https://www.ligamagic.com.br/',
+        queryParameters: {
+          'view': 'cards/search',
+          'card': query,
+        },
+        options: Options(
+          headers: _ligaHeaders,
+          responseType: ResponseType.plain,
+          validateStatus: (status) => status != null && status < 500,
+        ),
+      );
+      if (response.statusCode != 200 || response.data == null) return const [];
+      final raw = _extractJsonArray(response.data!, 'cardsjson');
+      if (raw == null) return const [];
+      final decoded = jsonDecode(raw);
+      if (decoded is! List) return const [];
+      return decoded
+          .whereType<Map>()
+          .map((row) => Map<String, dynamic>.from(row))
+          .toList(growable: false);
+    } catch (_) {
+      return const [];
+    }
+  }
+
   Options get _options => Options(
         headers: _headers,
         validateStatus: (status) => status != null && status < 500,
@@ -235,6 +350,45 @@ class ScryfallCatalogClient {
       final faceImages = firstFace['image_uris'];
       if (faceImages is Map) {
         return faceImages['normal'] as String? ?? faceImages['small'] as String?;
+      }
+    }
+    return null;
+  }
+
+  static String? _extractJsonArray(String html, String variableName) {
+    final startPattern = RegExp(
+      'var\\s+${RegExp.escape(variableName)}\\s*=\\s*\\[',
+      caseSensitive: false,
+    );
+    final startMatch = startPattern.firstMatch(html);
+    if (startMatch == null) return null;
+    final start = startMatch.end - 1;
+    var depth = 0;
+    var inString = false;
+    var quote = '';
+    var escaped = false;
+    for (var i = start; i < html.length; i++) {
+      final char = html[i];
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+          continue;
+        }
+        if (char == r'\') {
+          escaped = true;
+          continue;
+        }
+        if (char == quote) inString = false;
+        continue;
+      }
+      if (char == '"' || char == "'") {
+        inString = true;
+        quote = char;
+      } else if (char == '[') {
+        depth++;
+      } else if (char == ']') {
+        depth--;
+        if (depth == 0) return html.substring(start, i + 1);
       }
     }
     return null;
