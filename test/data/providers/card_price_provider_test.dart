@@ -88,6 +88,9 @@ void main() {
           ),
           imageUrl: null,
           visuallyVerified: true,
+          editionCode: '2XM',
+          averagePrice: 31.50,
+          maximumPrice: 39.90,
         ),
       );
       final provider = CardPriceProvider(
@@ -109,6 +112,10 @@ void main() {
       expect(item!.cardName, 'Eternal Witness');
       expect(item.referencePrice, 27.90);
       expect(item.imageUrl, 'https://catalog.example/eternal-witness.jpg');
+      expect(item.editionCode, '2XM');
+      expect(item.averagePrice, 31.50);
+      expect(item.maximumPrice, 39.90);
+      expect(item.priceVerified, isTrue);
       expect(liga.lastRequest, isNotNull);
       expect(liga.lastRequest!.cardName, 'Eternal Witness');
       expect(liga.lastRequest!.setCode, '2XM');
