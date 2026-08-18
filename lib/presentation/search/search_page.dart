@@ -22,6 +22,7 @@ class _SearchPageState extends State<SearchPage> {
   List<String> _suggestions = const [];
   List<CardPrinting> _printings = const [];
   CardPrinting? _selectedPrinting;
+  String? _resolvedImageUrl;
   bool _loadingSuggestions = false;
   bool _loadingPrintings = false;
   bool _foil = false;
@@ -46,6 +47,7 @@ class _SearchPageState extends State<SearchPage> {
     setState(() {
       _selectedPrinting = null;
       _printings = const [];
+      _resolvedImageUrl = null;
     });
 
     if (query.length < 2) {
@@ -81,12 +83,16 @@ class _SearchPageState extends State<SearchPage> {
       _loadingPrintings = true;
       _selectedPrinting = null;
       _printings = const [];
+      _resolvedImageUrl = null;
     });
     try {
-      final items = await _catalog.printings(name);
+      final resolved = await _catalog.find(name);
+      final items = await _catalog.printings(resolved?.name ?? name);
       if (!mounted || _controller.text.trim() != name) return;
       setState(() {
         _printings = items;
+        _resolvedImageUrl = resolved?.imageUrl ??
+            (items.isNotEmpty ? items.first.imageUrl : null);
         _loadingPrintings = false;
       });
     } catch (_) {
@@ -128,7 +134,7 @@ class _SearchPageState extends State<SearchPage> {
       'setCode': printing?.setCode,
       'setName': printing?.setName,
       'collectorNumber': printing?.collectorNumber,
-      'imageUrl': printing?.imageUrl,
+      'imageUrl': printing?.imageUrl ?? _resolvedImageUrl,
       'condition': _condition,
       'foil': _foil,
       'language': 'Português',
@@ -150,7 +156,7 @@ class _SearchPageState extends State<SearchPage> {
             onSubmitted: (_) => _search(),
             decoration: InputDecoration(
               labelText: 'Nome da carta',
-              hintText: 'Comece a digitar, ex.: Sol Ri...',
+              hintText: 'Português ou inglês, ex.: Testemunha Eterna',
               prefixIcon: const Icon(Icons.search),
               suffixIcon: _controller.text.isEmpty
                   ? null
@@ -162,6 +168,7 @@ class _SearchPageState extends State<SearchPage> {
                           _suggestions = const [];
                           _printings = const [];
                           _selectedPrinting = null;
+                          _resolvedImageUrl = null;
                         });
                       },
                       icon: const Icon(Icons.clear),
