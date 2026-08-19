@@ -17,6 +17,7 @@ class _ResultPageState extends State<ResultPage> {
   final _provider = CardPriceProvider();
   SaleItem? _item;
   bool _loading = true;
+  String? _loadError;
   double _discount = 20;
 
   @override
@@ -26,23 +27,39 @@ class _ResultPageState extends State<ResultPage> {
   }
 
   Future<void> _load() async {
-    final item = await _provider.find(
-      widget.filters['name'] as String? ?? '',
-      discountPercent: _discount,
-      setCode: widget.filters['setCode'] as String?,
-      setName: widget.filters['setName'] as String?,
-      collectorNumber: widget.filters['collectorNumber'] as String?,
-      imageUrl: widget.filters['imageUrl'] as String?,
-      language: widget.filters['language'] as String? ?? 'Português',
-      condition: widget.filters['condition'] as String? ?? 'NM',
-      foil: widget.filters['foil'] as bool? ?? false,
-    );
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _loadError = null;
+      });
+    }
 
-    if (!mounted) return;
-    setState(() {
-      _item = item;
-      _loading = false;
-    });
+    try {
+      final item = await _provider.find(
+        widget.filters['name'] as String? ?? '',
+        discountPercent: _discount,
+        setCode: widget.filters['setCode'] as String?,
+        setName: widget.filters['setName'] as String?,
+        collectorNumber: widget.filters['collectorNumber'] as String?,
+        imageUrl: widget.filters['imageUrl'] as String?,
+        language: widget.filters['language'] as String? ?? 'Português',
+        condition: widget.filters['condition'] as String? ?? 'NM',
+        foil: widget.filters['foil'] as bool? ?? false,
+      );
+
+      if (!mounted) return;
+      setState(() {
+        _item = item;
+        _loading = false;
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _item = null;
+        _loading = false;
+        _loadError = error.toString();
+      });
+    }
   }
 
   void _setDiscount(double value) {
@@ -98,14 +115,43 @@ class _ResultPageState extends State<ResultPage> {
     return Scaffold(
       appBar: AppBar(title: const Text('Cotação da carta')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const CircularProgressIndicator(),
+                    const SizedBox(height: 16),
+                    Text(
+                      'Consultando catálogo e LigaMagic…',
+                      textAlign: TextAlign.center,
+                      style: Theme.of(context).textTheme.bodyLarge,
+                    ),
+                  ],
+                ),
+              ),
+            )
           : _item == null
               ? Center(
                   child: Padding(
                     padding: const EdgeInsets.all(24),
-                    child: Text(
-                      'Carta não encontrada: $name',
-                      textAlign: TextAlign.center,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _loadError == null
+                              ? 'Carta não encontrada: $name'
+                              : 'Não foi possível concluir a consulta agora.',
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 16),
+                        FilledButton.icon(
+                          onPressed: _load,
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Tentar novamente'),
+                        ),
+                      ],
                     ),
                   ),
                 )
@@ -120,9 +166,7 @@ class _ResultPageState extends State<ResultPage> {
                           children: [
                             if (_item!.imageUrl != null &&
                                 _item!.imageUrl!.trim().isNotEmpty) ...[
-                              Center(
-                                child: _CardImage(url: _item!.imageUrl!),
-                              ),
+                              Center(child: _CardImage(url: _item!.imageUrl!)),
                               const SizedBox(height: 16),
                             ],
                             Text(
@@ -174,6 +218,12 @@ class _ResultPageState extends State<ResultPage> {
                               const Text(
                                 'Preço não confirmado na LigaMagic para esses filtros.',
                               ),
+                              const SizedBox(height: 12),
+                              OutlinedButton.icon(
+                                onPressed: _load,
+                                icon: const Icon(Icons.refresh),
+                                label: const Text('Tentar novamente'),
+                              ),
                             ],
                             const SizedBox(height: 12),
                             ExpansionTile(
@@ -186,22 +236,10 @@ class _ResultPageState extends State<ResultPage> {
                                     : 'Preço sem confirmação final',
                               ),
                               children: [
-                                _TechnicalRow(
-                                  label: 'Fonte',
-                                  value: _item!.sourceName ?? 'LigaMagic',
-                                ),
-                                _TechnicalRow(
-                                  label: 'Nome pesquisado',
-                                  value: name,
-                                ),
-                                _TechnicalRow(
-                                  label: 'Nome canônico',
-                                  value: _item!.cardName,
-                                ),
-                                _TechnicalRow(
-                                  label: 'Idioma',
-                                  value: language,
-                                ),
+                                _TechnicalRow(label: 'Fonte', value: _item!.sourceName ?? 'LigaMagic'),
+                                _TechnicalRow(label: 'Nome pesquisado', value: name),
+                                _TechnicalRow(label: 'Nome canônico', value: _item!.cardName),
+                                _TechnicalRow(label: 'Idioma', value: language),
                                 _TechnicalRow(
                                   label: 'Edição solicitada',
                                   value: [
@@ -214,37 +252,16 @@ class _ResultPageState extends State<ResultPage> {
                                           if (setName != null && setName.isNotEmpty) setName,
                                         ].join(' • '),
                                 ),
-                                _TechnicalRow(
-                                  label: 'Edição usada no preço',
-                                  value: _item!.editionCode ?? 'Não identificada',
-                                ),
-                                _TechnicalRow(
-                                  label: 'Collector',
-                                  value: collectorNumber ?? 'Não filtrado',
-                                ),
-                                _TechnicalRow(
-                                  label: 'Condição',
-                                  value: condition,
-                                ),
-                                _TechnicalRow(
-                                  label: 'Acabamento',
-                                  value: foil ? 'Foil' : 'Não foil',
-                                ),
+                                _TechnicalRow(label: 'Edição usada no preço', value: _item!.editionCode ?? 'Não identificada'),
+                                _TechnicalRow(label: 'Collector', value: collectorNumber ?? 'Não filtrado'),
+                                _TechnicalRow(label: 'Condição', value: condition),
+                                _TechnicalRow(label: 'Acabamento', value: foil ? 'Foil' : 'Não foil'),
                                 if (_item!.priceAvailable)
-                                  _TechnicalRow(
-                                    label: 'Preço mínimo',
-                                    value: _money(_item!.referencePrice),
-                                  ),
+                                  _TechnicalRow(label: 'Preço mínimo', value: _money(_item!.referencePrice)),
                                 if (_item!.averagePrice != null)
-                                  _TechnicalRow(
-                                    label: 'Preço médio',
-                                    value: _money(_item!.averagePrice!),
-                                  ),
+                                  _TechnicalRow(label: 'Preço médio', value: _money(_item!.averagePrice!)),
                                 if (_item!.maximumPrice != null)
-                                  _TechnicalRow(
-                                    label: 'Preço máximo',
-                                    value: _money(_item!.maximumPrice!),
-                                  ),
+                                  _TechnicalRow(label: 'Preço máximo', value: _money(_item!.maximumPrice!)),
                               ],
                             ),
                           ],
@@ -259,7 +276,6 @@ class _ResultPageState extends State<ResultPage> {
 
 class _TechnicalRow extends StatelessWidget {
   const _TechnicalRow({required this.label, required this.value});
-
   final String label;
   final String value;
 
@@ -272,10 +288,7 @@ class _TechnicalRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 145,
-            child: Text(
-              label,
-              style: const TextStyle(fontWeight: FontWeight.w600),
-            ),
+            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
           ),
           Expanded(child: Text(value)),
         ],
@@ -286,7 +299,6 @@ class _TechnicalRow extends StatelessWidget {
 
 class _CardImage extends StatefulWidget {
   const _CardImage({required this.url});
-
   final String url;
 
   @override
@@ -315,12 +327,8 @@ class _CardImageState extends State<_CardImage> {
   }
 
   String? _fallbackUrl(String url) {
-    if (url.contains('/normal/')) {
-      return url.replaceFirst('/normal/', '/small/');
-    }
-    if (url.contains('normal=')) {
-      return url.replaceFirst('normal=', 'small=');
-    }
+    if (url.contains('/normal/')) return url.replaceFirst('/normal/', '/small/');
+    if (url.contains('normal=')) return url.replaceFirst('normal=', 'small=');
     return null;
   }
 
