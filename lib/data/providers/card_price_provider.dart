@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../domain/entities/sale_item.dart';
 import '../datasources/ligamagic_browser_client.dart';
 import '../datasources/ligamagic_scrape_client.dart';
@@ -17,6 +19,10 @@ class CardPriceProvider {
   final LigaMagicBrowserClient _browserClient;
   final ScryfallCatalogClient _catalogClient;
 
+  static const _catalogTimeout = Duration(seconds: 5);
+  static const _httpLookupTimeout = Duration(seconds: 6);
+  static const _browserLookupTimeout = Duration(seconds: 20);
+
   Future<SaleItem?> find(
     String cardName, {
     double discountPercent = 20,
@@ -35,11 +41,16 @@ class CardPriceProvider {
     String? catalogImage = _nonBlank(imageUrl);
 
     try {
-      final catalogCard = await _catalogClient.find(normalized);
+      final catalogCard = await _catalogClient
+          .find(normalized)
+          .timeout(_catalogTimeout);
       if (catalogCard != null) {
         canonicalName = catalogCard.name;
         catalogImage ??= _nonBlank(catalogCard.imageUrl);
       }
+    } on TimeoutException {
+      // Keep the typed name and continue. Price lookup must not be blocked by
+      // a slow catalog request; the LigaMagic/browser path can still succeed.
     } catch (_) {}
 
     final request = PriceLookupRequest(
@@ -53,17 +64,26 @@ class CardPriceProvider {
     );
 
     try {
-      final result = await _client.lookup(request);
+      final result = await _client
+          .lookup(request)
+          .timeout(_httpLookupTimeout);
       if (result != null && result.response.referencePrice > 0) {
         return _toSaleItem(canonicalName, catalogImage, discountPercent, result);
       }
+    } on TimeoutException {
+      // LigaMagic sometimes stalls/blocks direct HTTP. Move quickly to the
+      // in-app browser instead of making the user wait through all retries.
     } catch (_) {}
 
     try {
-      final result = await _browserClient.lookup(request);
+      final result = await _browserClient
+          .lookup(request)
+          .timeout(_browserLookupTimeout);
       if (result != null && result.response.referencePrice > 0) {
         return _toSaleItem(canonicalName, catalogImage, discountPercent, result);
       }
+    } on TimeoutException {
+      // Return an explicit no-price result so the UI can offer "Tentar novamente".
     } catch (_) {}
 
     return SaleItem(
