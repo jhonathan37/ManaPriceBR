@@ -126,6 +126,15 @@ class _SearchPageState extends State<SearchPage> {
     await _ensurePrintings();
     if (!mounted) return;
 
+    if (_printings.isNotEmpty && _selectedPrinting == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Escolha a edição da carta antes de buscar o preço.'),
+        ),
+      );
+      return;
+    }
+
     FocusScope.of(context).unfocus();
     setState(() => _suggestions = const []);
     final printing = _selectedPrinting;
@@ -153,7 +162,7 @@ class _SearchPageState extends State<SearchPage> {
             autofocus: widget.initialName?.isEmpty ?? true,
             textInputAction: TextInputAction.search,
             onChanged: _onChanged,
-            onSubmitted: (_) => _search(),
+            onSubmitted: (_) => _ensurePrintings(),
             decoration: InputDecoration(
               labelText: 'Nome da carta',
               hintText: 'Português ou inglês, ex.: Testemunha Eterna',
@@ -199,40 +208,50 @@ class _SearchPageState extends State<SearchPage> {
               ),
             ),
           ],
+          const SizedBox(height: 18),
+          Text(
+            'Edição da carta',
+            style: Theme.of(context)
+                .textTheme
+                .titleMedium
+                ?.copyWith(fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'O preço será buscado somente para a edição que você selecionar.',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 10),
+          if (_loadingPrintings)
+            const LinearProgressIndicator()
+          else if (_printings.isNotEmpty)
+            DropdownButtonFormField<CardPrinting>(
+              initialValue: _selectedPrinting,
+              decoration: const InputDecoration(
+                labelText: 'Escolha a edição',
+                border: OutlineInputBorder(),
+              ),
+              items: _printings
+                  .map(
+                    (p) => DropdownMenuItem<CardPrinting>(
+                      value: p,
+                      child: Text(p.label, overflow: TextOverflow.ellipsis),
+                    ),
+                  )
+                  .toList(),
+              onChanged: (value) => setState(() => _selectedPrinting = value),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: _ensurePrintings,
+              icon: const Icon(Icons.layers_outlined),
+              label: const Text('Carregar edições desta carta'),
+            ),
           const SizedBox(height: 16),
           ExpansionTile(
-            title: const Text('Mais filtros'),
-            subtitle: Text(
-              '${_selectedPrinting?.setName ?? 'Qualquer edição'} • $_condition • ${_foil ? 'Foil' : 'Não foil'}',
-            ),
-            onExpansionChanged: (expanded) {
-              if (expanded) _ensurePrintings();
-            },
+            title: const Text('Condição e acabamento'),
+            subtitle: Text('$_condition • ${_foil ? 'Foil' : 'Não foil'}'),
             children: [
-              if (_loadingPrintings)
-                const Padding(
-                  padding: EdgeInsets.all(12),
-                  child: LinearProgressIndicator(),
-                )
-              else if (_printings.isNotEmpty)
-                DropdownButtonFormField<CardPrinting?>(
-                  initialValue: _selectedPrinting,
-                  decoration: const InputDecoration(labelText: 'Edição'),
-                  items: [
-                    const DropdownMenuItem<CardPrinting?>(
-                      value: null,
-                      child: Text('Qualquer edição'),
-                    ),
-                    ..._printings.map(
-                      (p) => DropdownMenuItem<CardPrinting?>(
-                        value: p,
-                        child: Text(p.label, overflow: TextOverflow.ellipsis),
-                      ),
-                    ),
-                  ],
-                  onChanged: (value) => setState(() => _selectedPrinting = value),
-                ),
-              const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 initialValue: _condition,
                 decoration: const InputDecoration(labelText: 'Condição'),
@@ -254,7 +273,11 @@ class _SearchPageState extends State<SearchPage> {
           FilledButton.icon(
             onPressed: _search,
             icon: const Icon(Icons.price_check),
-            label: const Text('Buscar preço na LigaMagic'),
+            label: Text(
+              _selectedPrinting == null
+                  ? 'Escolha a edição para buscar'
+                  : 'Buscar preço desta edição',
+            ),
           ),
         ],
       ),
