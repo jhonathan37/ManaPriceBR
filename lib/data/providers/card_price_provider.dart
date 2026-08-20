@@ -38,6 +38,7 @@ class CardPriceProvider {
     if (normalized.isEmpty) return null;
 
     String canonicalName = normalized;
+    String? displayName = normalized;
     String? catalogImage = _nonBlank(imageUrl);
 
     try {
@@ -46,6 +47,7 @@ class CardPriceProvider {
           .timeout(_catalogTimeout);
       if (catalogCard != null) {
         canonicalName = catalogCard.name;
+        displayName = _nonBlank(catalogCard.displayName) ?? normalized;
         catalogImage ??= _nonBlank(catalogCard.imageUrl);
       }
     } on TimeoutException {
@@ -68,7 +70,13 @@ class CardPriceProvider {
           .lookup(request)
           .timeout(_httpLookupTimeout);
       if (result != null && result.response.referencePrice > 0) {
-        return _toSaleItem(canonicalName, catalogImage, discountPercent, result);
+        return _toSaleItem(
+          canonicalName,
+          displayName,
+          catalogImage,
+          discountPercent,
+          result,
+        );
       }
     } on TimeoutException {
       // LigaMagic sometimes stalls/blocks direct HTTP. Move quickly to the
@@ -80,7 +88,13 @@ class CardPriceProvider {
           .lookup(request)
           .timeout(_browserLookupTimeout);
       if (result != null && result.response.referencePrice > 0) {
-        return _toSaleItem(canonicalName, catalogImage, discountPercent, result);
+        return _toSaleItem(
+          canonicalName,
+          displayName,
+          catalogImage,
+          discountPercent,
+          result,
+        );
       }
     } on TimeoutException {
       // Return an explicit no-price result so the UI can offer "Tentar novamente".
@@ -88,6 +102,7 @@ class CardPriceProvider {
 
     return SaleItem(
       cardName: canonicalName,
+      displayName: displayName,
       referencePrice: 0,
       discountPercent: discountPercent,
       imageUrl: catalogImage,
@@ -99,12 +114,14 @@ class CardPriceProvider {
 
   SaleItem _toSaleItem(
     String canonicalName,
+    String? displayName,
     String? catalogImage,
     double discountPercent,
     dynamic result,
   ) {
     return SaleItem(
       cardName: canonicalName,
+      displayName: displayName,
       referencePrice: result.response.referencePrice,
       discountPercent: discountPercent,
       imageUrl: catalogImage ?? _nonBlank(result.imageUrl),
