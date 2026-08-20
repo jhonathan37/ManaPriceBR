@@ -54,6 +54,8 @@ void main() {
 
       expect(item, isNotNull);
       expect(item!.cardName, 'Eternal Witness');
+      expect(item.displayName, 'Testemunha Eterna');
+      expect(item.visibleName, 'Testemunha Eterna');
       expect(item.imageUrl, 'https://catalog.example/eternal-witness.jpg');
     });
 
@@ -76,6 +78,7 @@ void main() {
 
       expect(item, isNotNull);
       expect(item!.referencePrice, 12.50);
+      expect(item.visibleName, 'Testemunha Eterna');
       expect(item.imageUrl, 'https://catalog.example/eternal-witness.jpg');
     });
 
@@ -110,6 +113,8 @@ void main() {
 
       expect(item, isNotNull);
       expect(item!.cardName, 'Eternal Witness');
+      expect(item.displayName, 'Testemunha Eterna');
+      expect(item.visibleName, 'Testemunha Eterna');
       expect(item.referencePrice, 27.90);
       expect(item.imageUrl, 'https://catalog.example/eternal-witness.jpg');
       expect(item.editionCode, '2XM');
