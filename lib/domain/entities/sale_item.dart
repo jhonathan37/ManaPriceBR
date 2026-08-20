@@ -3,6 +3,7 @@ class SaleItem {
     required this.cardName,
     required this.referencePrice,
     required this.discountPercent,
+    this.displayName,
     this.imageUrl,
     this.priceAvailable = true,
     this.sourceName,
@@ -13,6 +14,7 @@ class SaleItem {
   });
 
   final String cardName;
+  final String? displayName;
   final double referencePrice;
   final double discountPercent;
   final String? imageUrl;
@@ -22,6 +24,11 @@ class SaleItem {
   final double? averagePrice;
   final double? maximumPrice;
   final bool priceVerified;
+
+  String get visibleName =>
+      displayName != null && displayName!.trim().isNotEmpty
+          ? displayName!.trim()
+          : cardName;
 
   double get finalValue => priceAvailable
       ? referencePrice * (1 - discountPercent.clamp(0, 100) / 100)
