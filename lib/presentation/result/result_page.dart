@@ -69,6 +69,7 @@ class _ResultPageState extends State<ResultPage> {
       if (item != null) {
         _item = SaleItem(
           cardName: item.cardName,
+          displayName: item.displayName,
           referencePrice: item.referencePrice,
           discountPercent: value,
           imageUrl: item.imageUrl,
@@ -90,7 +91,7 @@ class _ResultPageState extends State<ResultPage> {
     final item = _item;
     if (item == null || !item.priceAvailable) return;
 
-    final message = '${item.cardName}\n'
+    final message = '${item.visibleName}\n'
         'Menor preço encontrado: ${_money(item.referencePrice)}\n'
         'Desconto: ${_discount.toStringAsFixed(0)}%\n'
         'Valor final: ${_money(item.finalValue)}';
@@ -170,12 +171,19 @@ class _ResultPageState extends State<ResultPage> {
                               const SizedBox(height: 16),
                             ],
                             Text(
-                              _item!.cardName,
+                              _item!.visibleName,
                               style: Theme.of(context)
                                   .textTheme
                                   .headlineSmall
                                   ?.copyWith(fontWeight: FontWeight.bold),
                             ),
+                            if (_item!.visibleName != _item!.cardName) ...[
+                              const SizedBox(height: 4),
+                              Text(
+                                _item!.cardName,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
                             const SizedBox(height: 8),
                             Text(
                               '${setName ?? 'Qualquer edição'} • $condition • ${foil ? 'Foil' : 'Não foil'}',
@@ -236,32 +244,70 @@ class _ResultPageState extends State<ResultPage> {
                                     : 'Preço sem confirmação final',
                               ),
                               children: [
-                                _TechnicalRow(label: 'Fonte', value: _item!.sourceName ?? 'LigaMagic'),
-                                _TechnicalRow(label: 'Nome pesquisado', value: name),
-                                _TechnicalRow(label: 'Nome canônico', value: _item!.cardName),
+                                _TechnicalRow(
+                                  label: 'Fonte',
+                                  value: _item!.sourceName ?? 'LigaMagic',
+                                ),
+                                _TechnicalRow(
+                                  label: 'Nome pesquisado',
+                                  value: name,
+                                ),
+                                _TechnicalRow(
+                                  label: 'Nome exibido',
+                                  value: _item!.visibleName,
+                                ),
+                                _TechnicalRow(
+                                  label: 'Nome canônico',
+                                  value: _item!.cardName,
+                                ),
                                 _TechnicalRow(label: 'Idioma', value: language),
                                 _TechnicalRow(
                                   label: 'Edição solicitada',
                                   value: [
-                                    if (setCode != null && setCode.isNotEmpty) setCode,
-                                    if (setName != null && setName.isNotEmpty) setName,
+                                    if (setCode != null && setCode.isNotEmpty)
+                                      setCode,
+                                    if (setName != null && setName.isNotEmpty)
+                                      setName,
                                   ].join(' • ').isEmpty
                                       ? 'Qualquer edição'
                                       : [
-                                          if (setCode != null && setCode.isNotEmpty) setCode,
-                                          if (setName != null && setName.isNotEmpty) setName,
+                                          if (setCode != null && setCode.isNotEmpty)
+                                            setCode,
+                                          if (setName != null && setName.isNotEmpty)
+                                            setName,
                                         ].join(' • '),
                                 ),
-                                _TechnicalRow(label: 'Edição usada no preço', value: _item!.editionCode ?? 'Não identificada'),
-                                _TechnicalRow(label: 'Collector', value: collectorNumber ?? 'Não filtrado'),
-                                _TechnicalRow(label: 'Condição', value: condition),
-                                _TechnicalRow(label: 'Acabamento', value: foil ? 'Foil' : 'Não foil'),
+                                _TechnicalRow(
+                                  label: 'Edição usada no preço',
+                                  value: _item!.editionCode ?? 'Não identificada',
+                                ),
+                                _TechnicalRow(
+                                  label: 'Collector',
+                                  value: collectorNumber ?? 'Não filtrado',
+                                ),
+                                _TechnicalRow(
+                                  label: 'Condição',
+                                  value: condition,
+                                ),
+                                _TechnicalRow(
+                                  label: 'Acabamento',
+                                  value: foil ? 'Foil' : 'Não foil',
+                                ),
                                 if (_item!.priceAvailable)
-                                  _TechnicalRow(label: 'Preço mínimo', value: _money(_item!.referencePrice)),
+                                  _TechnicalRow(
+                                    label: 'Preço mínimo',
+                                    value: _money(_item!.referencePrice),
+                                  ),
                                 if (_item!.averagePrice != null)
-                                  _TechnicalRow(label: 'Preço médio', value: _money(_item!.averagePrice!)),
+                                  _TechnicalRow(
+                                    label: 'Preço médio',
+                                    value: _money(_item!.averagePrice!),
+                                  ),
                                 if (_item!.maximumPrice != null)
-                                  _TechnicalRow(label: 'Preço máximo', value: _money(_item!.maximumPrice!)),
+                                  _TechnicalRow(
+                                    label: 'Preço máximo',
+                                    value: _money(_item!.maximumPrice!),
+                                  ),
                               ],
                             ),
                           ],
@@ -288,7 +334,10 @@ class _TechnicalRow extends StatelessWidget {
         children: [
           SizedBox(
             width: 145,
-            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
+            child: Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w600),
+            ),
           ),
           Expanded(child: Text(value)),
         ],
@@ -327,8 +376,12 @@ class _CardImageState extends State<_CardImage> {
   }
 
   String? _fallbackUrl(String url) {
-    if (url.contains('/normal/')) return url.replaceFirst('/normal/', '/small/');
-    if (url.contains('normal=')) return url.replaceFirst('normal=', 'small=');
+    if (url.contains('/normal/')) {
+      return url.replaceFirst('/normal/', '/small/');
+    }
+    if (url.contains('normal=')) {
+      return url.replaceFirst('normal=', 'small=');
+    }
     return null;
   }
 
