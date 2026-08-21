@@ -30,8 +30,11 @@ class _CardSearchPageState extends State<CardSearchPage> {
     await Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => CardScannerPage(
-          onCardNameDetected: (name) {
-            _nameController.text = name;
+          onCardDetected: (detected) {
+            final name = detected['name']?.toString().trim();
+            if (name != null && name.isNotEmpty) {
+              _nameController.text = name;
+            }
             Navigator.of(context).pop();
           },
         ),
@@ -60,7 +63,6 @@ class _CardSearchPageState extends State<CardSearchPage> {
       _searchedName = null;
     });
 
-    // Integration point for the real CardSearchController/provider.
     await Future<void>.delayed(const Duration(milliseconds: 350));
 
     if (!mounted) return;
@@ -85,8 +87,8 @@ class _CardSearchPageState extends State<CardSearchPage> {
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: _loading ? null : _openScanner,
-              icon: const Icon(Icons.photo_camera),
-              label: const Text('TIRAR FOTO DA CARTA'),
+              icon: const Icon(Icons.document_scanner),
+              label: const Text('ESCANEAR CARTA'),
             ),
             const SizedBox(height: 16),
             CardSearchForm(
