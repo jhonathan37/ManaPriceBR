@@ -4,6 +4,7 @@ import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 
 import '../../core/services/card_ocr_reader.dart';
+import '../../core/services/oracle_text_matcher.dart';
 import '../../data/datasources/scryfall_catalog_client.dart';
 
 class CardScannerPage extends StatefulWidget {
@@ -19,6 +20,7 @@ class _CardScannerPageState extends State<CardScannerPage>
     with WidgetsBindingObserver {
   final _ocr = CardOcrReader();
   final _catalog = ScryfallCatalogClient();
+  final _oracleMatcher = OracleTextMatcher();
 
   CameraController? _camera;
   Timer? _scanTimer;
@@ -104,26 +106,33 @@ class _CardScannerPageState extends State<CardScannerPage>
     _processing = true;
     try {
       final image = await camera.takePicture();
-      final rawName = await _ocr.readCardName(image.path);
+      final ocrResult = await _ocr.read(image.path);
       if (!mounted || _completed) return;
 
-      if (rawName == null || rawName.trim().length < 3) {
-        setState(() => _status = 'Lendo... mantenha a carta centralizada.');
-        _resetCandidate();
-        return;
+      String? candidate;
+      final rawName = ocrResult.cardName?.trim();
+      if (rawName != null && rawName.length >= 3) {
+        final resolved = await _catalog.find(rawName).timeout(
+          const Duration(seconds: 4),
+          onTimeout: () => null,
+        );
+        if (!mounted || _completed) return;
+        candidate = resolved?.displayName?.trim().isNotEmpty == true
+            ? resolved!.displayName!.trim()
+            : resolved?.name.trim();
       }
 
-      final resolved = await _catalog.find(rawName).timeout(
-        const Duration(seconds: 4),
-        onTimeout: () => null,
-      );
-      if (!mounted || _completed) return;
-
-      final candidate = resolved?.displayName?.trim().isNotEmpty == true
-          ? resolved!.displayName!.trim()
-          : resolved?.name.trim();
       if (candidate == null || candidate.isEmpty) {
-        setState(() => _status = 'Texto detectado, confirmando carta...');
+        setState(() => _status = 'Nome incerto. Tentando pelo texto da carta...');
+        final textMatch = await _oracleMatcher
+            .findFromOcrText(ocrResult.rawText)
+            .timeout(const Duration(seconds: 5), onTimeout: () => null);
+        if (!mounted || _completed) return;
+        candidate = textMatch?.displayName;
+      }
+
+      if (candidate == null || candidate.trim().isEmpty) {
+        setState(() => _status = 'Lendo... mantenha a carta centralizada.');
         _resetCandidate();
         return;
       }
@@ -263,7 +272,7 @@ class _CardScannerPageState extends State<CardScannerPage>
             ],
             const SizedBox(height: 8),
             Text(
-              'Não precisa tirar foto. Mantenha o nome da carta dentro do quadro até a confirmação.',
+              'Não precisa tirar foto. O app tenta reconhecer primeiro pelo nome e, se necessário, pelo texto da carta.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
