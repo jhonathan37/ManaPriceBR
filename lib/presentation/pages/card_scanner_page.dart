@@ -1,7 +1,10 @@
+import 'dart:async';
+
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
-import 'package:image_picker/image_picker.dart';
 
 import '../../core/services/card_ocr_reader.dart';
+import '../../data/datasources/scryfall_catalog_client.dart';
 
 class CardScannerPage extends StatefulWidget {
   const CardScannerPage({super.key, required this.onCardNameDetected});
@@ -12,77 +15,258 @@ class CardScannerPage extends StatefulWidget {
   State<CardScannerPage> createState() => _CardScannerPageState();
 }
 
-class _CardScannerPageState extends State<CardScannerPage> {
-  final _picker = ImagePicker();
+class _CardScannerPageState extends State<CardScannerPage>
+    with WidgetsBindingObserver {
   final _ocr = CardOcrReader();
-  bool _loading = false;
-  String? _detectedName;
+  final _catalog = ScryfallCatalogClient();
+
+  CameraController? _camera;
+  Timer? _scanTimer;
+  bool _initializing = true;
+  bool _processing = false;
+  bool _completed = false;
   String? _error;
+  String? _lastCandidate;
+  int _sameCandidateCount = 0;
+  String _status = 'Inicializando câmera...';
 
-  Future<void> _capture() async {
-    final image = await _picker.pickImage(
-      source: ImageSource.camera,
-      imageQuality: 90,
-      preferredCameraDevice: CameraDevice.rear,
-    );
-    if (image == null) return;
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initializeCamera();
+  }
 
-    setState(() {
-      _loading = true;
-      _error = null;
-      _detectedName = null;
-    });
+  Future<void> _initializeCamera() async {
+    _scanTimer?.cancel();
+    await _camera?.dispose();
+    _camera = null;
+
+    if (mounted) {
+      setState(() {
+        _initializing = true;
+        _error = null;
+        _status = 'Inicializando câmera...';
+      });
+    }
 
     try {
-      final name = await _ocr.readCardName(image.path);
-      if (!mounted) return;
-      if (name == null) {
-        setState(() => _error = 'Não consegui identificar o nome da carta.');
+      final cameras = await availableCameras();
+      if (cameras.isEmpty) {
+        throw StateError('Nenhuma câmera disponível.');
+      }
+      final rear = cameras.where((c) => c.lensDirection == CameraLensDirection.back);
+      final selected = rear.isNotEmpty ? rear.first : cameras.first;
+      final controller = CameraController(
+        selected,
+        ResolutionPreset.high,
+        enableAudio: false,
+      );
+      await controller.initialize();
+      if (!mounted) {
+        await controller.dispose();
         return;
       }
-      setState(() => _detectedName = name);
+      _camera = controller;
+      setState(() {
+        _initializing = false;
+        _status = 'Aponte para a carta. Lendo automaticamente...';
+      });
+      _scanTimer = Timer.periodic(
+        const Duration(milliseconds: 1300),
+        (_) => _scanOnce(),
+      );
+    } on CameraException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _initializing = false;
+        _error = e.code == 'CameraAccessDenied'
+            ? 'Permita o acesso à câmera para usar o scanner.'
+            : 'Não foi possível abrir a câmera.';
+        _status = 'Scanner indisponível';
+      });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Falha ao processar a imagem.');
+      setState(() {
+        _initializing = false;
+        _error = 'Não foi possível iniciar o scanner.';
+        _status = 'Scanner indisponível';
+      });
+    }
+  }
+
+  Future<void> _scanOnce() async {
+    final camera = _camera;
+    if (_processing || _completed || camera == null || !camera.value.isInitialized) {
+      return;
+    }
+
+    _processing = true;
+    try {
+      final image = await camera.takePicture();
+      final rawName = await _ocr.readCardName(image.path);
+      if (!mounted || _completed) return;
+
+      if (rawName == null || rawName.trim().length < 3) {
+        setState(() => _status = 'Lendo... mantenha a carta centralizada.');
+        _resetCandidate();
+        return;
+      }
+
+      final resolved = await _catalog.find(rawName).timeout(
+        const Duration(seconds: 4),
+        onTimeout: () => null,
+      );
+      if (!mounted || _completed) return;
+
+      final candidate = resolved?.displayName?.trim().isNotEmpty == true
+          ? resolved!.displayName!.trim()
+          : resolved?.name.trim();
+      if (candidate == null || candidate.isEmpty) {
+        setState(() => _status = 'Texto detectado, confirmando carta...');
+        _resetCandidate();
+        return;
+      }
+
+      final normalized = candidate.toLowerCase();
+      if (_lastCandidate?.toLowerCase() == normalized) {
+        _sameCandidateCount += 1;
+      } else {
+        _lastCandidate = candidate;
+        _sameCandidateCount = 1;
+      }
+
+      setState(() {
+        _status = _sameCandidateCount >= 2
+            ? '$candidate detectada ✓'
+            : 'Possível carta: $candidate — confirmando...';
+      });
+
+      if (_sameCandidateCount >= 2) {
+        _completed = true;
+        _scanTimer?.cancel();
+        await Future<void>.delayed(const Duration(milliseconds: 350));
+        if (!mounted) return;
+        widget.onCardNameDetected(candidate);
+      }
+    } catch (_) {
+      if (mounted && !_completed) {
+        setState(() => _status = 'Lendo... ajuste o foco e a iluminação.');
+      }
     } finally {
-      if (mounted) setState(() => _loading = false);
+      _processing = false;
+    }
+  }
+
+  void _resetCandidate() {
+    _lastCandidate = null;
+    _sameCandidateCount = 0;
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.inactive || state == AppLifecycleState.paused) {
+      _scanTimer?.cancel();
+      _camera?.dispose();
+      _camera = null;
+    } else if (state == AppLifecycleState.resumed && !_completed) {
+      _initializeCamera();
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _scanTimer?.cancel();
+    _camera?.dispose();
     _ocr.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final camera = _camera;
     return Scaffold(
-      appBar: AppBar(title: const Text('Scanner de carta')),
+      appBar: AppBar(title: const Text('Scanner automático')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            FilledButton.icon(
-              onPressed: _loading ? null : _capture,
-              icon: const Icon(Icons.photo_camera),
-              label: Text(_loading ? 'Lendo carta...' : 'TIRAR FOTO'),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (!_initializing && camera != null && camera.value.isInitialized)
+                      CameraPreview(camera)
+                    else
+                      Container(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        child: const Center(child: CircularProgressIndicator()),
+                      ),
+                    IgnorePointer(
+                      child: Center(
+                        child: FractionallySizedBox(
+                          widthFactor: .78,
+                          heightFactor: .72,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Theme.of(context).colorScheme.primary,
+                                width: 3,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 20),
-            if (_loading) const LinearProgressIndicator(),
-            if (_error != null)
-              Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            if (_detectedName != null) ...[
-              Text('Carta identificada', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Text(_detectedName!, style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 16),
-              FilledButton(
-                onPressed: () => widget.onCardNameDetected(_detectedName!),
-                child: const Text('USAR ESTE NOME'),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                if (_processing) ...[
+                  const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+                  const SizedBox(width: 10),
+                ],
+                Expanded(
+                  child: Text(
+                    _status,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                ),
+              ],
+            ),
+            if (_error != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                _error!,
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _initializeCamera,
+                icon: const Icon(Icons.refresh),
+                label: const Text('Tentar novamente'),
               ),
             ],
+            const SizedBox(height: 8),
+            Text(
+              'Não precisa tirar foto. Mantenha o nome da carta dentro do quadro até a confirmação.',
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
           ],
         ),
       ),
