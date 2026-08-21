@@ -5,6 +5,7 @@ import '../../presentation/home/home_page.dart';
 import '../../presentation/pages/batch_lookup_page.dart';
 import '../../presentation/pages/card_scanner_page.dart';
 import '../../presentation/result/result_page.dart';
+import '../../presentation/search/effect_search_page.dart';
 import '../../presentation/search/search_page.dart';
 import '../../presentation/settings/settings_page.dart';
 import '../services/sale_session.dart';
@@ -24,6 +25,10 @@ final GoRouter appRouter = GoRouter(
           initialCollectorNumber: extra?['collectorNumber'] as String?,
         );
       },
+    ),
+    GoRoute(
+      path: '/effect-search',
+      builder: (context, state) => const EffectSearchPage(),
     ),
     GoRoute(
       path: '/batch',
