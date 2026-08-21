@@ -1,7 +1,7 @@
 name: manaprice_br
 description: "ManaPrice BR - consulta inteligente de preços para Magic: The Gathering."
 publish_to: "none"
-version: 0.1.8+9
+version: 0.1.9+10
 
 environment:
   sdk: ">=3.5.0 <4.0.0"
