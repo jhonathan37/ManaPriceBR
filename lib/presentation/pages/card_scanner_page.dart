@@ -8,9 +8,9 @@ import '../../core/services/oracle_text_matcher.dart';
 import '../../data/datasources/scryfall_catalog_client.dart';
 
 class CardScannerPage extends StatefulWidget {
-  const CardScannerPage({super.key, required this.onCardNameDetected});
+  const CardScannerPage({super.key, required this.onCardDetected});
 
-  final ValueChanged<String> onCardNameDetected;
+  final ValueChanged<Map<String, String?>> onCardDetected;
 
   @override
   State<CardScannerPage> createState() => _CardScannerPageState();
@@ -29,6 +29,7 @@ class _CardScannerPageState extends State<CardScannerPage>
   bool _completed = false;
   String? _error;
   String? _lastCandidate;
+  String? _collectorHint;
   int _sameCandidateCount = 0;
   String _status = 'Inicializando câmera...';
 
@@ -43,7 +44,6 @@ class _CardScannerPageState extends State<CardScannerPage>
     _scanTimer?.cancel();
     await _camera?.dispose();
     _camera = null;
-
     if (mounted) {
       setState(() {
         _initializing = true;
@@ -51,19 +51,12 @@ class _CardScannerPageState extends State<CardScannerPage>
         _status = 'Inicializando câmera...';
       });
     }
-
     try {
       final cameras = await availableCameras();
-      if (cameras.isEmpty) {
-        throw StateError('Nenhuma câmera disponível.');
-      }
+      if (cameras.isEmpty) throw StateError('Nenhuma câmera disponível.');
       final rear = cameras.where((c) => c.lensDirection == CameraLensDirection.back);
       final selected = rear.isNotEmpty ? rear.first : cameras.first;
-      final controller = CameraController(
-        selected,
-        ResolutionPreset.high,
-        enableAudio: false,
-      );
+      final controller = CameraController(selected, ResolutionPreset.high, enableAudio: false);
       await controller.initialize();
       if (!mounted) {
         await controller.dispose();
@@ -74,10 +67,7 @@ class _CardScannerPageState extends State<CardScannerPage>
         _initializing = false;
         _status = 'Aponte para a carta. Lendo automaticamente...';
       });
-      _scanTimer = Timer.periodic(
-        const Duration(milliseconds: 1300),
-        (_) => _scanOnce(),
-      );
+      _scanTimer = Timer.periodic(const Duration(milliseconds: 1300), (_) => _scanOnce());
     } on CameraException catch (e) {
       if (!mounted) return;
       setState(() {
@@ -99,10 +89,7 @@ class _CardScannerPageState extends State<CardScannerPage>
 
   Future<void> _scanOnce() async {
     final camera = _camera;
-    if (_processing || _completed || camera == null || !camera.value.isInitialized) {
-      return;
-    }
-
+    if (_processing || _completed || camera == null || !camera.value.isInitialized) return;
     _processing = true;
     try {
       final image = await camera.takePicture();
@@ -140,15 +127,18 @@ class _CardScannerPageState extends State<CardScannerPage>
       final normalized = candidate.toLowerCase();
       if (_lastCandidate?.toLowerCase() == normalized) {
         _sameCandidateCount += 1;
+        _collectorHint ??= ocrResult.collectorNumber;
       } else {
         _lastCandidate = candidate;
+        _collectorHint = ocrResult.collectorNumber;
         _sameCandidateCount = 1;
       }
 
       setState(() {
+        final collectorText = _collectorHint == null ? '' : ' • #${_collectorHint!}';
         _status = _sameCandidateCount >= 2
-            ? '$candidate detectada ✓'
-            : 'Possível carta: $candidate — confirmando...';
+            ? '$candidate$collectorText detectada ✓'
+            : 'Possível carta: $candidate$collectorText — confirmando...';
       });
 
       if (_sameCandidateCount >= 2) {
@@ -156,7 +146,10 @@ class _CardScannerPageState extends State<CardScannerPage>
         _scanTimer?.cancel();
         await Future<void>.delayed(const Duration(milliseconds: 350));
         if (!mounted) return;
-        widget.onCardNameDetected(candidate);
+        widget.onCardDetected({
+          'name': candidate,
+          'collectorNumber': _collectorHint,
+        });
       }
     } catch (_) {
       if (mounted && !_completed) {
@@ -169,6 +162,7 @@ class _CardScannerPageState extends State<CardScannerPage>
 
   void _resetCandidate() {
     _lastCandidate = null;
+    _collectorHint = null;
     _sameCandidateCount = 0;
   }
 
@@ -240,11 +234,7 @@ class _CardScannerPageState extends State<CardScannerPage>
             Row(
               children: [
                 if (_processing) ...[
-                  const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  ),
+                  const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2)),
                   const SizedBox(width: 10),
                 ],
                 Expanded(
@@ -272,7 +262,7 @@ class _CardScannerPageState extends State<CardScannerPage>
             ],
             const SizedBox(height: 8),
             Text(
-              'Não precisa tirar foto. O app tenta reconhecer primeiro pelo nome e, se necessário, pelo texto da carta.',
+              'O app tenta reconhecer nome, texto e número de coleção para chegar na impressão correta.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall,
             ),
