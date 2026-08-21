@@ -7,9 +7,14 @@ import '../../data/datasources/scryfall_catalog_client.dart';
 import '../../domain/entities/card_printing.dart';
 
 class SearchPage extends StatefulWidget {
-  const SearchPage({super.key, this.initialName});
+  const SearchPage({
+    super.key,
+    this.initialName,
+    this.initialCollectorNumber,
+  });
 
   final String? initialName;
+  final String? initialCollectorNumber;
 
   @override
   State<SearchPage> createState() => _SearchPageState();
@@ -32,6 +37,11 @@ class _SearchPageState extends State<SearchPage> {
   void initState() {
     super.initState();
     _controller = TextEditingController(text: widget.initialName ?? '');
+    if ((widget.initialName ?? '').trim().isNotEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _loadPrintings(widget.initialName!.trim());
+      });
+    }
   }
 
   @override
@@ -89,9 +99,21 @@ class _SearchPageState extends State<SearchPage> {
       final resolved = await _catalog.find(name);
       final items = await _catalog.printings(resolved?.name ?? name);
       if (!mounted || _controller.text.trim() != name) return;
+
+      CardPrinting? hinted;
+      final collector = widget.initialCollectorNumber?.trim().toLowerCase();
+      if (collector != null && collector.isNotEmpty) {
+        final matches = items
+            .where((p) => p.collectorNumber.trim().toLowerCase() == collector)
+            .toList();
+        if (matches.length == 1) hinted = matches.first;
+      }
+
       setState(() {
         _printings = items;
-        _resolvedImageUrl = resolved?.imageUrl ??
+        _selectedPrinting = hinted;
+        _resolvedImageUrl = hinted?.imageUrl ??
+            resolved?.imageUrl ??
             (items.isNotEmpty ? items.first.imageUrl : null);
         _loadingPrintings = false;
       });
@@ -218,7 +240,9 @@ class _SearchPageState extends State<SearchPage> {
           ),
           const SizedBox(height: 4),
           Text(
-            'O preço será buscado somente para a edição que você selecionar.',
+            _selectedPrinting != null && widget.initialCollectorNumber != null
+                ? 'Edição pré-selecionada pelo scanner. Confirme antes de cotar.'
+                : 'O preço será buscado somente para a edição que você selecionar.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 10),
