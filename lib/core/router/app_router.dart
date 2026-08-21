@@ -19,7 +19,10 @@ final GoRouter appRouter = GoRouter(
       path: '/search',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>?;
-        return SearchPage(initialName: extra?['name'] as String?);
+        return SearchPage(
+          initialName: extra?['name'] as String?,
+          initialCollectorNumber: extra?['collectorNumber'] as String?,
+        );
       },
     ),
     GoRoute(
@@ -33,8 +36,8 @@ final GoRouter appRouter = GoRouter(
     GoRoute(
       path: '/scanner',
       builder: (context, state) => CardScannerPage(
-        onCardNameDetected: (name) {
-          context.go('/search', extra: {'name': name});
+        onCardDetected: (detected) {
+          context.go('/search', extra: detected);
         },
       ),
     ),
