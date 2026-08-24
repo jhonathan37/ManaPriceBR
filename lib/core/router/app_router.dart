@@ -2,6 +2,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../data/providers/card_price_provider.dart';
 import '../../presentation/home/home_page.dart';
+import '../../presentation/life/life_counter_page.dart';
 import '../../presentation/pages/batch_lookup_page.dart';
 import '../../presentation/pages/card_scanner_page.dart';
 import '../../presentation/result/result_page.dart';
@@ -16,6 +17,7 @@ final GoRouter appRouter = GoRouter(
   initialLocation: '/',
   routes: [
     GoRoute(path: '/', builder: (context, state) => const HomePage()),
+    GoRoute(path: '/life', builder: (context, state) => const LifeCounterPage()),
     GoRoute(
       path: '/search',
       builder: (context, state) {
@@ -26,25 +28,15 @@ final GoRouter appRouter = GoRouter(
         );
       },
     ),
-    GoRoute(
-      path: '/effect-search',
-      builder: (context, state) => const EffectSearchPage(),
-    ),
+    GoRoute(path: '/effect-search', builder: (context, state) => const EffectSearchPage()),
     GoRoute(
       path: '/batch',
-      builder: (context, state) => BatchLookupPage(
-        findCard: (name) => _cardPriceProvider.find(name),
-        onAddToSale: SaleSession.addAll,
-      ),
+      builder: (context, state) => BatchLookupPage(findCard: (name) => _cardPriceProvider.find(name), onAddToSale: SaleSession.addAll),
     ),
     GoRoute(path: '/settings', builder: (context, state) => const SettingsPage()),
     GoRoute(
       path: '/scanner',
-      builder: (context, state) => CardScannerPage(
-        onCardDetected: (detected) {
-          context.go('/search', extra: detected);
-        },
-      ),
+      builder: (context, state) => CardScannerPage(onCardDetected: (detected) { context.go('/search', extra: detected); }),
     ),
     GoRoute(
       path: '/result',
