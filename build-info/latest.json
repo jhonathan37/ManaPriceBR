@@ -1,9 +1,9 @@
 {
-  "run_id": "32881877381",
-  "run_number": "228",
-  "commit": "67ff6c39bb0b8f41d2a92e382e903f6f97dcf50a",
+  "run_id": "32883974959",
+  "run_number": "229",
+  "commit": "6e38777e250a0c45059af0c475e71b8ffc5afc32",
   "version": "0.3.2+22",
-  "job_status": "failure",
-  "release_apk_artifact": "manapricebr-release-apk-228",
-  "release_aab_artifact": "manapricebr-release-aab-228"
+  "job_status": "success",
+  "release_apk_artifact": "manapricebr-release-apk-229",
+  "release_aab_artifact": "manapricebr-release-aab-229"
 }
