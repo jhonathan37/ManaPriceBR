@@ -27,6 +27,7 @@ class _CardScannerPageState extends State<CardScannerPage>
   bool _initializing = true;
   bool _processing = false;
   bool _completed = false;
+  bool _torchOn = false;
   String? _error;
   String? _lastCandidate;
   String? _collectorHint;
@@ -44,6 +45,8 @@ class _CardScannerPageState extends State<CardScannerPage>
     _scanTimer?.cancel();
     await _camera?.dispose();
     _camera = null;
+    _torchOn = false;
+    _resetCandidate();
     if (mounted) {
       setState(() {
         _initializing = true;
@@ -73,17 +76,33 @@ class _CardScannerPageState extends State<CardScannerPage>
       setState(() {
         _initializing = false;
         _error = e.code == 'CameraAccessDenied'
-            ? 'Permita o acesso à câmera para usar o scanner.'
-            : 'Não foi possível abrir a câmera.';
+            ? 'Permita o acesso à câmera nas configurações do aparelho para usar o scanner.'
+            : 'Não foi possível abrir a câmera. Você ainda pode buscar a carta manualmente.';
         _status = 'Scanner indisponível';
       });
     } catch (_) {
       if (!mounted) return;
       setState(() {
         _initializing = false;
-        _error = 'Não foi possível iniciar o scanner.';
+        _error = 'Não foi possível iniciar o scanner. Você ainda pode buscar a carta manualmente.';
         _status = 'Scanner indisponível';
       });
+    }
+  }
+
+  Future<void> _toggleTorch() async {
+    final camera = _camera;
+    if (camera == null || !camera.value.isInitialized) return;
+    try {
+      final next = !_torchOn;
+      await camera.setFlashMode(next ? FlashMode.torch : FlashMode.off);
+      if (mounted) setState(() => _torchOn = next);
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Lanterna indisponível nesta câmera.')),
+        );
+      }
     }
   }
 
@@ -160,6 +179,12 @@ class _CardScannerPageState extends State<CardScannerPage>
     }
   }
 
+  void _manualSearch() {
+    _completed = true;
+    _scanTimer?.cancel();
+    widget.onCardDetected({'name': null, 'collectorNumber': null});
+  }
+
   void _resetCandidate() {
     _lastCandidate = null;
     _collectorHint = null;
@@ -172,6 +197,7 @@ class _CardScannerPageState extends State<CardScannerPage>
       _scanTimer?.cancel();
       _camera?.dispose();
       _camera = null;
+      _torchOn = false;
     } else if (state == AppLifecycleState.resumed && !_completed) {
       _initializeCamera();
     }
@@ -189,8 +215,19 @@ class _CardScannerPageState extends State<CardScannerPage>
   @override
   Widget build(BuildContext context) {
     final camera = _camera;
+    final cameraReady = !_initializing && camera != null && camera.value.isInitialized;
     return Scaffold(
-      appBar: AppBar(title: const Text('Scanner automático')),
+      appBar: AppBar(
+        title: const Text('Scanner automático'),
+        actions: [
+          if (cameraReady)
+            IconButton(
+              tooltip: _torchOn ? 'Desligar lanterna' : 'Ligar lanterna',
+              onPressed: _toggleTorch,
+              icon: Icon(_torchOn ? Icons.flashlight_off_rounded : Icons.flashlight_on_rounded),
+            ),
+        ],
+      ),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -202,30 +239,45 @@ class _CardScannerPageState extends State<CardScannerPage>
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    if (!_initializing && camera != null && camera.value.isInitialized)
+                    if (cameraReady)
                       CameraPreview(camera)
-                    else
+                    else if (_initializing)
                       Container(
                         color: Theme.of(context).colorScheme.surfaceContainerHighest,
                         child: const Center(child: CircularProgressIndicator()),
+                      )
+                    else
+                      Container(
+                        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.no_photography_outlined, size: 56, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                              const SizedBox(height: 12),
+                              const Text('Câmera indisponível', style: TextStyle(fontWeight: FontWeight.w800)),
+                            ],
+                          ),
+                        ),
                       ),
-                    IgnorePointer(
-                      child: Center(
-                        child: FractionallySizedBox(
-                          widthFactor: .78,
-                          heightFactor: .72,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Theme.of(context).colorScheme.primary,
-                                width: 3,
+                    if (cameraReady)
+                      IgnorePointer(
+                        child: Center(
+                          child: FractionallySizedBox(
+                            widthFactor: .78,
+                            heightFactor: .72,
+                            child: Container(
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Theme.of(context).colorScheme.primary,
+                                  width: 3,
+                                ),
                               ),
                             ),
                           ),
                         ),
                       ),
-                    ),
                   ],
                 ),
               ),
@@ -254,13 +306,34 @@ class _CardScannerPageState extends State<CardScannerPage>
                 style: TextStyle(color: Theme.of(context).colorScheme.error),
               ),
               const SizedBox(height: 10),
-              OutlinedButton.icon(
-                onPressed: _initializeCamera,
-                icon: const Icon(Icons.refresh),
-                label: const Text('Tentar novamente'),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _initializeCamera,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('Tentar câmera'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _manualSearch,
+                      icon: const Icon(Icons.search_rounded),
+                      label: const Text('Buscar manualmente'),
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _manualSearch,
+                icon: const Icon(Icons.keyboard_rounded),
+                label: const Text('Prefiro digitar o nome da carta'),
               ),
             ],
-            const SizedBox(height: 8),
+            const SizedBox(height: 4),
             Text(
               'O app tenta reconhecer nome, texto e número de coleção para chegar na impressão correta.',
               textAlign: TextAlign.center,
