@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../data/datasources/scryfall_catalog_client.dart';
+import '../../data/catalog/live_card_catalog.dart';
 import '../../data/local/app_settings_store.dart';
 import '../../domain/entities/card_printing.dart';
 
@@ -16,7 +16,7 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   late final TextEditingController _controller;
-  final ScryfallCatalogClient _catalog = ScryfallCatalogClient();
+  final LiveCardCatalog _catalog = LiveCardCatalog();
   Timer? _debounce;
   List<String> _suggestions = const [];
   List<CardPrinting> _printings = const [];
