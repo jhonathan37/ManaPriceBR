@@ -75,7 +75,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 20),
                 DropdownButtonFormField<String>(
-                  value: language,
+                  initialValue: language,
                   decoration: const InputDecoration(labelText: 'Idioma padrão'),
                   items: const [
                     DropdownMenuItem(value: 'Português', child: Text('Português')),
@@ -86,7 +86,7 @@ class _SettingsPageState extends State<SettingsPage> {
                 ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<String>(
-                  value: condition,
+                  initialValue: condition,
                   decoration: const InputDecoration(labelText: 'Condição padrão'),
                   items: const ['NM', 'SP', 'MP', 'HP', 'DMG']
                       .map((value) => DropdownMenuItem(value: value, child: Text(value)))
