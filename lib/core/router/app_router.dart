@@ -1,6 +1,8 @@
 import 'package:go_router/go_router.dart';
 
+import '../../data/local/quote_history_store.dart';
 import '../../data/providers/card_price_provider.dart';
+import '../../presentation/history/history_page.dart';
 import '../../presentation/home/home_page.dart';
 import '../../presentation/life/life_counter_page.dart';
 import '../../presentation/pages/batch_lookup_page.dart';
@@ -18,6 +20,7 @@ final GoRouter appRouter = GoRouter(
   routes: [
     GoRoute(path: '/', builder: (context, state) => const HomePage()),
     GoRoute(path: '/life', builder: (context, state) => const LifeCounterPage()),
+    GoRoute(path: '/history', builder: (context, state) => const HistoryPage()),
     GoRoute(
       path: '/search',
       builder: (context, state) {
@@ -42,6 +45,7 @@ final GoRouter appRouter = GoRouter(
       path: '/result',
       builder: (context, state) {
         final extra = state.extra as Map<String, dynamic>? ?? const <String, dynamic>{};
+        QuoteHistoryStore.add(extra);
         return ResultPage(filters: extra);
       },
     ),
