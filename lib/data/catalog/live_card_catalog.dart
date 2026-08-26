@@ -25,16 +25,26 @@ class LiveCardCatalog {
 
   Future<ScryfallCatalogCard?> find(String query) => _base.find(query);
 
+  /// Resolves a typed/localized card name once, then loads all printings using
+  /// the canonical Scryfall name. This keeps backwards compatibility for
+  /// callers that only have the typed name.
   Future<List<CardPrinting>> printings(String exactName) async {
     final input = exactName.trim();
     if (input.isEmpty) return const [];
-
     final resolved = await _base.find(input);
-    final canonicalName = resolved?.name ?? input;
+    return printingsForCanonical(resolved?.name ?? input);
+  }
+
+  /// Loads printings for a name that is already canonical. This intentionally
+  /// does not call find() again, avoiding the double lookup that was causing
+  /// edition loading to fail on localized names such as Portuguese cards.
+  Future<List<CardPrinting>> printingsForCanonical(String canonicalName) async {
+    final input = canonicalName.trim();
+    if (input.isEmpty) return const [];
 
     var nextPage = 'https://api.scryfall.com/cards/search';
     Map<String, dynamic>? queryParameters = {
-      'q': 'exact:"$canonicalName"',
+      'q': 'exact:"$input"',
       'unique': 'prints',
       'order': 'released',
       'dir': 'desc',
@@ -52,6 +62,8 @@ class LiveCardCatalog {
         queryParameters: queryParameters,
         options: Options(
           headers: _headers,
+          sendTimeout: const Duration(seconds: 8),
+          receiveTimeout: const Duration(seconds: 10),
           validateStatus: (status) => status != null && status < 500,
         ),
       );
