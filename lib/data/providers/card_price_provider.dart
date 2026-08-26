@@ -19,9 +19,9 @@ class CardPriceProvider {
   final LigaMagicBrowserClient _browserClient;
   final ScryfallCatalogClient _catalogClient;
 
-  static const _catalogTimeout = Duration(seconds: 5);
-  static const _httpLookupTimeout = Duration(seconds: 6);
-  static const _browserLookupTimeout = Duration(seconds: 20);
+  static const _catalogTimeout = Duration(seconds: 4);
+  static const _httpLookupTimeout = Duration(seconds: 5);
+  static const _browserLookupTimeout = Duration(seconds: 8);
 
   Future<SaleItem?> find(
     String cardName, {
@@ -37,25 +37,47 @@ class CardPriceProvider {
     final normalized = cardName.trim();
     if (normalized.isEmpty) return null;
 
-    String canonicalName = normalized;
-    String? displayName = normalized;
-    String? catalogImage = _nonBlank(imageUrl);
+    // Resolve catalog metadata in parallel. It must never block the first
+    // price attempt. This keeps the result screen responsive even when
+    // Scryfall is slow or temporarily unavailable.
+    final catalogFuture = _catalogClient
+        .find(normalized)
+        .timeout(_catalogTimeout)
+        .catchError((_) => null);
 
+    final typedRequest = PriceLookupRequest(
+      cardName: normalized,
+      setCode: setCode,
+      setName: setName,
+      collectorNumber: collectorNumber,
+      language: language,
+      condition: condition,
+      foil: foil,
+    );
+
+    dynamic directResult;
     try {
-      final catalogCard = await _catalogClient
-          .find(normalized)
-          .timeout(_catalogTimeout);
-      if (catalogCard != null) {
-        canonicalName = catalogCard.name;
-        displayName = _nonBlank(catalogCard.displayName) ?? normalized;
-        catalogImage ??= _nonBlank(catalogCard.imageUrl);
-      }
-    } on TimeoutException {
-      // Keep the typed name and continue. Price lookup must not be blocked by
-      // a slow catalog request; the LigaMagic/browser path can still succeed.
+      directResult = await _client.lookup(typedRequest).timeout(_httpLookupTimeout);
     } catch (_) {}
 
-    final request = PriceLookupRequest(
+    final catalogCard = await catalogFuture;
+    final canonicalName = catalogCard?.name ?? normalized;
+    final displayName = _nonBlank(catalogCard?.displayName) ?? normalized;
+    final catalogImage = _nonBlank(imageUrl) ?? _nonBlank(catalogCard?.imageUrl);
+
+    if (directResult != null && directResult.response.referencePrice > 0) {
+      return _toSaleItem(
+        canonicalName,
+        displayName,
+        catalogImage,
+        discountPercent,
+        directResult,
+      );
+    }
+
+    // Browser fallback uses the resolved canonical name when available, but
+    // only after the fast direct lookup has already failed.
+    final browserRequest = PriceLookupRequest(
       cardName: canonicalName,
       setCode: setCode,
       setName: setName,
@@ -66,26 +88,8 @@ class CardPriceProvider {
     );
 
     try {
-      final result = await _client
-          .lookup(request)
-          .timeout(_httpLookupTimeout);
-      if (result != null && result.response.referencePrice > 0) {
-        return _toSaleItem(
-          canonicalName,
-          displayName,
-          catalogImage,
-          discountPercent,
-          result,
-        );
-      }
-    } on TimeoutException {
-      // LigaMagic sometimes stalls/blocks direct HTTP. Move quickly to the
-      // in-app browser instead of making the user wait through all retries.
-    } catch (_) {}
-
-    try {
       final result = await _browserClient
-          .lookup(request)
+          .lookup(browserRequest)
           .timeout(_browserLookupTimeout);
       if (result != null && result.response.referencePrice > 0) {
         return _toSaleItem(
@@ -96,10 +100,10 @@ class CardPriceProvider {
           result,
         );
       }
-    } on TimeoutException {
-      // Return an explicit no-price result so the UI can offer "Tentar novamente".
     } catch (_) {}
 
+    // Never trap the UI behind an endless spinner. Return the card metadata
+    // even if the external price source did not answer this time.
     return SaleItem(
       cardName: canonicalName,
       displayName: displayName,
