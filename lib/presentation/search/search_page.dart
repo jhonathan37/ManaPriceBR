@@ -33,15 +33,34 @@ class _SearchPageState extends State<SearchPage> {
 
   void _onChanged(String value){_debounce?.cancel();final query=value.trim();setState((){_selectedPrinting=null;_printings=const[];_resolvedImageUrl=null;_catalogNotice=null;});if(query.length<2){setState((){_suggestions=const[];_loadingSuggestions=false;});return;}_debounce=Timer(const Duration(milliseconds:350),()async{if(!mounted)return;setState(()=>_loadingSuggestions=true);try{final items=await _catalog.autocomplete(query).timeout(const Duration(seconds:5));if(!mounted||_controller.text.trim()!=query)return;setState((){_suggestions=items;_loadingSuggestions=false;_catalogNotice=items.isEmpty?'Não apareceram sugestões. Você pode buscar diretamente o nome digitado.':null;});}catch(_){if(mounted&&_controller.text.trim()==query)setState((){_suggestions=const[];_loadingSuggestions=false;_catalogNotice='Sugestões indisponíveis agora. A busca direta continua funcionando.';});}});}
 
-  Future<void> _loadPrintings(String name) async {if(!mounted)return;setState((){_loadingPrintings=true;_selectedPrinting=null;_printings=const[];_resolvedImageUrl=null;});try{final resolved=await _catalog.find(name).timeout(const Duration(seconds:6));final canonical=resolved?.name??name;final items=await _catalog.printings(canonical).timeout(const Duration(seconds:8));if(!mounted||_controller.text.trim()!=name)return;CardPrinting? hinted;final collector=widget.initialCollectorNumber?.trim().toLowerCase();if(collector!=null&&collector.isNotEmpty){final matches=items.where((p)=>p.collectorNumber.trim().toLowerCase()==collector).toList();if(matches.length==1)hinted=matches.first;}setState((){_printings=items;_selectedPrinting=hinted;_resolvedImageUrl=hinted?.imageUrl??resolved?.imageUrl??(items.isNotEmpty?items.first.imageUrl:null);_loadingPrintings=false;if(items.isEmpty)_catalogNotice='Não consegui carregar as edições agora. Você ainda pode consultar a carta.';});}catch(_){if(mounted&&_controller.text.trim()==name)setState((){_loadingPrintings=false;_catalogNotice='As edições não responderam. Isso não bloqueia a consulta da carta.';});}}
+  Future<void> _loadPrintings(String name) async {
+    if(!mounted)return;
+    setState((){_loadingPrintings=true;_selectedPrinting=null;_printings=const[];_resolvedImageUrl=null;_catalogNotice=null;});
+    try{
+      final resolved=await _catalog.find(name).timeout(const Duration(seconds:8));
+      final canonical=resolved?.name??name;
+      final items=await _catalog.printingsForCanonical(canonical).timeout(const Duration(seconds:15));
+      if(!mounted||_controller.text.trim()!=name)return;
+      CardPrinting? hinted;
+      final collector=widget.initialCollectorNumber?.trim().toLowerCase();
+      if(collector!=null&&collector.isNotEmpty){final matches=items.where((p)=>p.collectorNumber.trim().toLowerCase()==collector).toList();if(matches.length==1)hinted=matches.first;}
+      setState((){
+        _printings=items;
+        _selectedPrinting=hinted;
+        _resolvedImageUrl=hinted?.imageUrl??resolved?.imageUrl??(items.isNotEmpty?items.first.imageUrl:null);
+        _loadingPrintings=false;
+        _catalogNotice=items.isEmpty?'Não encontrei edições para esta carta no catálogo.':null;
+      });
+    }catch(_){
+      if(mounted&&_controller.text.trim()==name)setState((){_loadingPrintings=false;_catalogNotice='Não consegui carregar as edições agora. Tente novamente.';});
+    }
+  }
 
   void _selectSuggestion(String name){_controller.text=name;_controller.selection=TextSelection.collapsed(offset:name.length);setState(()=>_suggestions=const[]);_loadPrintings(name);}
   Future<void> _loadEditionsOnly() async {final name=_controller.text.trim();if(name.isEmpty){_notice('Digite o nome da carta primeiro.');return;}if(_loadingPrintings)return;await _loadPrintings(name);}
 
   void _openResult({CardPrinting? printing}){final name=_controller.text.trim();if(name.isEmpty)return;FocusScope.of(context).unfocus();setState(()=>_suggestions=const[]);context.push('/result',extra:{'name':name,'setCode':printing?.setCode,'setName':printing?.setName,'collectorNumber':printing?.collectorNumber,'imageUrl':printing?.imageUrl??_resolvedImageUrl,'condition':_condition,'foil':_foil,'language':_language});}
 
-  // IMPORTANT: the main search never waits for Scryfall printings. Edition
-  // discovery is optional, so a slow/blocked catalog cannot lock the user out.
   void _search(){final name=_controller.text.trim();if(name.isEmpty){_notice('Digite o nome da carta que você quer consultar.');return;}_openResult(printing:_selectedPrinting);}
   void _notice(String text)=>ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text(text)));
 
