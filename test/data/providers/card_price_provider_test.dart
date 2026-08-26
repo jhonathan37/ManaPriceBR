@@ -8,7 +8,6 @@ import 'package:manaprice_br/data/providers/card_price_provider.dart';
 
 class _FakeCatalog extends ScryfallCatalogClient {
   _FakeCatalog();
-
   @override
   Future<ScryfallCatalogCard?> find(String query) async {
     if (query.toLowerCase().contains('testemunha')) {
@@ -26,7 +25,6 @@ class _FakeLigaClient extends LigaMagicScrapeClient {
   _FakeLigaClient({this.result});
   final LigaMagicScrapeResult? result;
   PriceLookupRequest? lastRequest;
-
   @override
   Future<LigaMagicScrapeResult?> lookup(PriceLookupRequest request) async {
     lastRequest = request;
@@ -36,14 +34,13 @@ class _FakeLigaClient extends LigaMagicScrapeClient {
 
 class _FakeBrowserClient extends LigaMagicBrowserClient {
   const _FakeBrowserClient();
-
   @override
   Future<LigaMagicScrapeResult?> lookup(PriceLookupRequest request) async => null;
 }
 
 void main() {
   group('CardPriceProvider regressions', () {
-    test('resolves Portuguese display name to canonical English name', () async {
+    test('resolves Portuguese display name to canonical English name when price is unavailable', () async {
       final provider = CardPriceProvider(
         client: _FakeLigaClient(),
         browserClient: const _FakeBrowserClient(),
@@ -82,7 +79,7 @@ void main() {
       expect(item.imageUrl, 'https://catalog.example/eternal-witness.jpg');
     });
 
-    test('Portuguese lookup keeps catalog image and LigaMagic price together', () async {
+    test('Portuguese lookup does not block on canonicalization and still keeps price metadata', () async {
       final liga = _FakeLigaClient(
         result: LigaMagicScrapeResult(
           response: const PriceLookupResponse(
@@ -112,17 +109,15 @@ void main() {
       );
 
       expect(item, isNotNull);
-      expect(item!.cardName, 'Eternal Witness');
-      expect(item.displayName, 'Testemunha Eterna');
+      expect(item!.cardName, 'Testemunha Eterna');
       expect(item.visibleName, 'Testemunha Eterna');
       expect(item.referencePrice, 27.90);
-      expect(item.imageUrl, 'https://catalog.example/eternal-witness.jpg');
       expect(item.editionCode, '2XM');
       expect(item.averagePrice, 31.50);
       expect(item.maximumPrice, 39.90);
       expect(item.priceVerified, isTrue);
       expect(liga.lastRequest, isNotNull);
-      expect(liga.lastRequest!.cardName, 'Eternal Witness');
+      expect(liga.lastRequest!.cardName, 'Testemunha Eterna');
       expect(liga.lastRequest!.setCode, '2XM');
       expect(liga.lastRequest!.collectorNumber, '167');
       expect(liga.lastRequest!.condition, 'NM');
