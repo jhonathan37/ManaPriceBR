@@ -109,7 +109,7 @@ void main() {
       );
 
       expect(item, isNotNull);
-      expect(item!.cardName, 'Testemunha Eterna');
+      expect(item!.cardName, 'Eternal Witness');
       expect(item.visibleName, 'Testemunha Eterna');
       expect(item.referencePrice, 27.90);
       expect(item.editionCode, '2XM');
